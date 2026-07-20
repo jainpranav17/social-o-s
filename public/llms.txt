@@ -1,0 +1,9 @@
+# SocialOS
+
+> Your AI-powered social media operating system — connect every account, generate captions with AI, schedule posts, and monitor analytics from one premium dashboard.
+
+SocialOS is a modern SaaS platform for managing all your social media channels (Instagram, Facebook, LinkedIn, X, YouTube, Threads) from a single AI-powered workspace.
+
+## Pages
+- [Home](/): Product overview, features, AI showcase, testimonials, FAQ
+- [Sign in / Sign up](/auth): Access your SocialOS workspace
