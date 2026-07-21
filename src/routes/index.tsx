@@ -12,6 +12,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Instagram,
+  Facebook,
+  Linkedin,
+  Youtube,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
@@ -37,7 +41,30 @@ export const Route = createFileRoute("/")({
   }),
 });
 
-const platforms = ["Instagram", "Facebook", "LinkedIn", "X / Twitter", "YouTube", "Threads"];
+function XIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  );
+}
+
+function ThreadsIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 192 192" fill="currentColor" className={className}>
+      <path d="M141.537 88.948c-.773-.03-1.544-.043-2.31-.043-20.732 0-37.247 16.514-37.247 37.247 0 10.37 4.127 19.78 10.793 26.68 6.745 6.99 15.986 10.567 26.454 10.567 10.158 0 19.347-3.415 25.862-9.617 6.47-6.16 9.877-14.774 9.877-24.898 0-26.063-22.18-47.332-47.332-47.332-26.634 0-48.337 21.703-48.337 48.337 0 25.56 20.8 46.36 46.36 46.36 10.297 0 20.218-3.344 28.69-9.673a3.52 3.52 0 0 1 4.296 5.578c-9.786 7.309-21.272 11.238-32.986 11.238-29.42 0-53.4-23.98-53.4-53.491 0-30.566 24.872-55.438 55.438-55.438 29.176 0 54.475 24.086 54.475 52.426 0 12.062-4.08 22.457-11.83 29.835-7.618 7.248-18.232 11.134-29.89 11.134-8.793 0-16.574-3.003-21.92-8.455-5.328-5.434-8.262-12.87-8.262-20.941 0-16.84 13.407-30.247 30.247-30.247 16.527 0 29.882 13.14 30.24 29.356a3.52 3.52 0 1 1-7.037.155c-.266-12.042-10.155-22.37-23.203-22.37-12.96 0-23.208 10.25-23.208 23.208 0 6.643 2.375 12.637 6.688 16.883 4.237 4.167 10.373 6.46 17.29 6.46 9.873 0 18.792-3.327 25.11-9.352 6.304-6.012 9.5-14.49 9.5-23.86 0-24.516-20.862-45.41-45.41-45.41-24.63 0-44.757 20.127-44.757 44.757 0 21.65 17.61 39.26 39.26 39.26 8.528 0 16.634-2.73 23.447-7.9a3.52 3.52 0 0 1 4.267 5.6c-7.904 6.02-17.34 9.34-27.714 9.34-25.525 0-46.3-20.775-46.3-46.3 0-28.513 23.2-51.713 51.713-51.713 28.306 0 51.344 23.038 51.344 51.344 0 25.105-20.375 45.48-45.48 45.48-11.83 0-22.466-4.81-29.957-13.54-7.532-8.77-11.68-20.75-11.68-33.743 0-28.14 22.89-51.03 51.03-51.03 27.234 0 49.387 22.153 49.387 49.387 0 22.39-18.214 40.603-40.603 40.603-8.835 0-17.296-2.905-23.83-8.18a3.52 3.52 0 0 1 4.316-5.56c5.556 4.484 12.658 6.74 20.088 6.74 18.51 0 33.56-15.05 33.56-33.563 0-23.355-19.002-42.357-42.357-42.357-24.26 0-43.991 19.73-43.991 43.99 0 28.59 23.262 51.85 51.85 51.85 24.317 0 44.11-19.793 44.11-44.11v-3.52c0-1.944-1.576-3.52-3.52-3.52z"/>
+    </svg>
+  );
+}
+
+const platforms = [
+  { name: "Instagram", icon: Instagram, color: "text-pink-600 dark:text-pink-400" },
+  { name: "Facebook", icon: Facebook, color: "text-blue-600 dark:text-blue-400" },
+  { name: "LinkedIn", icon: Linkedin, color: "text-blue-700 dark:text-blue-500" },
+  { name: "X / Twitter", icon: XIcon, color: "text-foreground" },
+  { name: "YouTube", icon: Youtube, color: "text-red-600 dark:text-red-400" },
+  { name: "Threads", icon: ThreadsIcon, color: "text-foreground" },
+];
 
 const features = [
   {
@@ -478,10 +505,11 @@ function Landing() {
           <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
             {platforms.map((p) => (
               <div
-                key={p}
-                className="flex items-center justify-center rounded-xl border border-border bg-card px-4 py-3 text-sm font-semibold"
+                key={p.name}
+                className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-3.5 text-sm font-semibold hover:shadow-sm transition"
               >
-                {p}
+                <p.icon className={`h-4.5 w-4.5 ${p.color}`} />
+                <span>{p.name}</span>
               </div>
             ))}
           </div>
