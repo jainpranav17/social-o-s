@@ -15,9 +15,46 @@ export const askChatbot = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const key = process.env.LOVABLE_API_KEY;
     if (!key) {
-      // Fallback response if AI is not configured to avoid error screens
-      return { 
-        reply: "Hello! I am the SocialOS Assistant. AI features are currently running in demo mode. Let me know if you need help connecting platforms, generating captions, or using the scheduler!" 
+      const lastUserMsg = [...data.messages].reverse().find(m => m.role === "user")?.content.toLowerCase() || "";
+
+      if (lastUserMsg.includes("schedule") || lastUserMsg.includes("calendar") || lastUserMsg.includes("queue")) {
+        return {
+          reply: "📅 **How to Schedule Posts:**\n1. Go to the **Publisher & Scheduler** page from the sidebar.\n2. Select the platforms you want to publish to.\n3. Write your caption and upload your media (image or video).\n4. Change the toggle to **Schedule**.\n5. Select your date and time, and click **Schedule Post**!"
+        };
+      }
+      
+      if (lastUserMsg.includes("caption") || lastUserMsg.includes("ai studio") || lastUserMsg.includes("generate")) {
+        return {
+          reply: "✍️ **How to Generate Captions:**\n1. Go to the **AI Caption Studio** from the sidebar.\n2. Describe your topic and target audience.\n3. Select your platform and choose a tone (e.g. professional, playful, marketing).\n4. Click **Generate**! SocialOS will generate the copy, hashtags, CTAs, and a virality score."
+        };
+      }
+
+      if (lastUserMsg.includes("platform") || lastUserMsg.includes("connect") || lastUserMsg.includes("instagram") || lastUserMsg.includes("facebook") || lastUserMsg.includes("linkedin") || lastUserMsg.includes("youtube") || lastUserMsg.includes("twitter") || lastUserMsg.includes("threads")) {
+        return {
+          reply: "🔌 **Supported Platforms:**\nSocialOS connects to **Instagram**, **Facebook**, **LinkedIn**, **Twitter/X**, **YouTube**, and **Threads**.\n\nTo link a platform:\n1. Click **Connected Platforms** in the sidebar.\n2. Select either **Sandbox Mode** (for simulation) or **Real Mode**.\n3. Click the respective platform card to link your account."
+        };
+      }
+
+      if (lastUserMsg.includes("analytic") || lastUserMsg.includes("view") || lastUserMsg.includes("metric") || lastUserMsg.includes("reach") || lastUserMsg.includes("score")) {
+        return {
+          reply: "📈 **Understanding Analytics:**\nGo to the **Dashboard** home page to view:\n• **AI Captions**: Total copy items generated.\n• **Average Virality**: Predicted success score calculated by Gemini.\n• **Connected accounts**: Number of active platform links.\n• **Engagement charts**: Weekly timeline metrics."
+        };
+      }
+
+      if (lastUserMsg.includes("hi") || lastUserMsg.includes("hello") || lastUserMsg.includes("hey")) {
+        return {
+          reply: "Hello! 👋 I am the SocialOS assistant. Ask me anything about how to connect platforms, schedule posts, generate AI captions, or track dashboard analytics!"
+        };
+      }
+
+      if (lastUserMsg.includes("thank") || lastUserMsg.includes("thanks")) {
+        return {
+          reply: "You're welcome! Let me know if there's anything else I can do to help you streamline your social media workflow. 🚀"
+        };
+      }
+
+      return {
+        reply: "I am the SocialOS AI Assistant. Ask me a question about:\n• 📅 **Scheduling** posts\n• ✍️ Generating **captions**\n• 🔌 Connecting **platforms**\n• 📈 Viewing **analytics**\n\n*(Note: AI Gateway API Key is not configured in your .env file, so I'm assisting you in offline guide mode!)*"
       };
     }
 
