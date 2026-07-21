@@ -112,12 +112,12 @@ function TiltCard({
 }
 
 const platforms = [
-  { name: "Instagram", icon: Instagram, color: "text-pink-600 dark:text-pink-400" },
-  { name: "Facebook", icon: Facebook, color: "text-blue-600 dark:text-blue-400" },
-  { name: "LinkedIn", icon: Linkedin, color: "text-blue-700 dark:text-blue-500" },
-  { name: "X / Twitter", icon: XIcon, color: "text-foreground" },
-  { name: "YouTube", icon: Youtube, color: "text-red-600 dark:text-red-400" },
-  { name: "Threads", icon: ThreadsIcon, color: "text-foreground" },
+  { name: "Instagram", icon: Instagram, color: "text-pink-600 dark:text-pink-400", desc: "Share photos, reels, and stories." },
+  { name: "Facebook", icon: Facebook, color: "text-blue-600 dark:text-blue-400", desc: "Reach pages and community groups." },
+  { name: "LinkedIn", icon: Linkedin, color: "text-blue-700 dark:text-blue-500", desc: "Publish professional B2B updates." },
+  { name: "X / Twitter", icon: XIcon, color: "text-foreground", desc: "Post short news updates and threads." },
+  { name: "YouTube", icon: Youtube, color: "text-red-600 dark:text-red-400", desc: "Upload high-quality video content." },
+  { name: "Threads", icon: ThreadsIcon, color: "text-foreground", desc: "Start casual, text-based threads." },
 ];
 
 const features = [
@@ -629,15 +629,19 @@ function Landing() {
           <p className="text-center text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             Publish everywhere
           </p>
-          <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="mt-8 grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-6">
             {platforms.map((p) => (
-              <div
+              <TiltCard
                 key={p.name}
-                className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-3.5 text-sm font-semibold hover:shadow-sm transition"
+                max={6}
+                className="flex flex-col items-center text-center gap-3 rounded-2xl border border-border bg-card p-5 text-sm font-semibold hover:shadow-elegant transition cursor-pointer"
               >
-                <p.icon className={`h-4.5 w-4.5 ${p.color}`} />
-                <span>{p.name}</span>
-              </div>
+                <p.icon className={`h-6 w-6 ${p.color}`} />
+                <div>
+                  <div className="text-foreground font-bold">{p.name}</div>
+                  <div className="mt-1.5 text-xs font-normal text-muted-foreground leading-normal">{p.desc}</div>
+                </div>
+              </TiltCard>
             ))}
           </div>
         </div>
