@@ -588,11 +588,36 @@ function Landing() {
             </div>
           </div>
 
-          <div className="relative mx-auto mt-16 max-w-5xl">
+          <div className="relative mx-auto mt-16 max-w-5xl group/slider">
+            {/* Pulsing Blue Background Glow */}
             <div
-              className="absolute inset-x-8 -top-6 h-24 blur-3xl"
-              style={{ background: "var(--gradient-primary)", opacity: 0.4 }}
+              className="absolute -inset-10 rounded-full blur-3xl opacity-35 mix-blend-screen pointer-events-none -z-10"
+              style={{
+                background: "radial-gradient(circle, #00d2ff 0%, #0066ff 60%, transparent 100%)",
+                animation: "pulse-glow 5s ease-in-out infinite",
+              }}
             />
+
+            {/* Rotating Blue Neon Ring Behind */}
+            <div
+              className="absolute left-1/2 top-1/2 w-[112%] h-[112%] rounded-full opacity-35 border border-dashed border-cyan-400 pointer-events-none -z-20 mix-blend-screen"
+              style={{
+                animation: "spin-slow 25s linear infinite",
+              }}
+            />
+            
+            {/* Counter-Rotating Blue Neon Ring Behind */}
+            <div
+              className="absolute left-1/2 top-1/2 w-[105%] h-[105%] rounded-full opacity-20 border border-cyan-500/50 pointer-events-none -z-20 mix-blend-screen"
+              style={{
+                animation: "spin-reverse 18s linear infinite",
+              }}
+            />
+
+            {/* Moving Neon Light Beams (top & bottom border tracks) */}
+            <div className="absolute inset-x-8 -top-1 h-[2px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-80 pointer-events-none blur-[1px] animate-pulse" />
+            <div className="absolute inset-x-8 -bottom-1 h-[2px] bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-80 pointer-events-none blur-[1px] animate-pulse" />
+
             <ImageSlider />
           </div>
         </div>
