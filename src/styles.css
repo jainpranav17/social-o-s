@@ -212,3 +212,24 @@
     transform: rotate(360deg);
   }
 }
+
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-15px) rotate(4deg);
+  }
+}
+
+@utility animate-float-slow {
+  animation: float-slow 7s ease-in-out infinite;
+}
+
+@utility animate-float-medium {
+  animation: float-slow 6s ease-in-out infinite;
+}
+
+@utility animate-float-fast {
+  animation: float-slow 5s ease-in-out infinite;
+}

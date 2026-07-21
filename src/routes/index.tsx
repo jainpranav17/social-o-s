@@ -25,6 +25,9 @@ import { toast } from "sonner";
 import heroImg from "@/assets/hero.jpg";
 import schedulerImg from "@/assets/slide-scheduler.png";
 import platformsImg from "@/assets/slide-platforms.png";
+import heart3d from "@/assets/3d-heart.png";
+import calendar3d from "@/assets/3d-calendar.png";
+import chart3d from "@/assets/3d-chart.png";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export const Route = createFileRoute("/")({
@@ -554,7 +557,18 @@ function Landing() {
 
       {/* Hero */}
       <section className="relative overflow-hidden" style={{ background: "var(--gradient-hero)" }}>
-        <div className="mx-auto max-w-7xl px-6 pb-24 pt-20 lg:pt-28">
+        {/* Floating 3D Icons */}
+        <div className="absolute left-[5%] top-[15%] hidden xl:block w-36 h-36 pointer-events-none select-none animate-float-slow">
+          <img src={heart3d} alt="3D Heart Icon" className="w-full h-full object-contain filter drop-shadow-[0_15px_30px_rgba(236,72,153,0.35)]" />
+        </div>
+        <div className="absolute right-[5%] top-[18%] hidden xl:block w-40 h-40 pointer-events-none select-none animate-float-medium">
+          <img src={calendar3d} alt="3D Calendar Icon" className="w-full h-full object-contain filter drop-shadow-[0_15px_30px_rgba(6,182,212,0.35)]" />
+        </div>
+        <div className="absolute left-[10%] bottom-[12%] hidden xl:block w-32 h-32 pointer-events-none select-none animate-float-fast">
+          <img src={chart3d} alt="3D Analytics Icon" className="w-full h-full object-contain filter drop-shadow-[0_15px_30px_rgba(16,185,129,0.35)]" />
+        </div>
+
+        <div className="mx-auto max-w-7xl px-6 pb-24 pt-20 lg:pt-28 relative z-10">
           <div className="mx-auto max-w-3xl text-center">
             <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-surface-elevated/60 px-4 py-1.5 text-xs font-medium text-muted-foreground backdrop-blur">
               <Zap className="h-3.5 w-3.5 text-accent" />
