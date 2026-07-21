@@ -6,6 +6,7 @@ import { Sparkles, Loader2, Copy, Check, Search } from "lucide-react";
 import { toast } from "sonner";
 import { generateCaption, listCaptions } from "@/lib/captions.functions";
 import { Skeleton } from "@/components/ui/skeleton";
+import wand3d from "@/assets/3d-ai-wand.png";
 
 export const Route = createFileRoute("/_authenticated/captions")({
   component: CaptionStudio,
@@ -72,12 +73,17 @@ function CaptionStudio() {
   });
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="font-display text-3xl font-bold tracking-tight">AI Caption Studio</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Give it a topic. Get platform-perfect copy in seconds.
-        </p>
+    <div className="space-y-8 relative">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display text-3xl font-bold tracking-tight">AI Caption Studio</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Give it a topic. Get platform-perfect copy in seconds.
+          </p>
+        </div>
+        <div className="hidden sm:block w-16 h-16 pointer-events-none select-none animate-float-slow -mt-2">
+          <img src={wand3d} alt="3D Wand" className="w-full h-full object-contain filter drop-shadow-[0_10px_20px_rgba(147,51,234,0.3)]" />
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-5">

@@ -28,6 +28,9 @@ import platformsImg from "@/assets/slide-platforms.png";
 import heart3d from "@/assets/3d-heart.png";
 import calendar3d from "@/assets/3d-calendar.png";
 import chart3d from "@/assets/3d-chart.png";
+import brain3d from "@/assets/3d-ai-brain.png";
+import rocket3d from "@/assets/3d-ai-rocket.png";
+import star3d from "@/assets/3d-ai-star.png";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export const Route = createFileRoute("/")({
@@ -570,8 +573,8 @@ function Landing() {
 
         <div className="mx-auto max-w-7xl px-6 pb-24 pt-20 lg:pt-28 relative z-10">
           <div className="mx-auto max-w-3xl text-center">
-            <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-surface-elevated/60 px-4 py-1.5 text-xs font-medium text-muted-foreground backdrop-blur">
-              <Zap className="h-3.5 w-3.5 text-accent" />
+            <div className="mx-auto mb-6 inline-flex items-center gap-2.5 rounded-full border border-border bg-surface-elevated/60 px-4 py-1.5 text-xs font-semibold text-muted-foreground backdrop-blur">
+              <img src={star3d} alt="3D Star" className="h-4.5 w-4.5 object-contain animate-spin" style={{ animationDuration: "12s" }} />
               Now in beta — free while we're building
             </div>
             <h1 className="font-display text-5xl font-bold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
@@ -700,8 +703,13 @@ function Landing() {
         style={{ background: "var(--gradient-hero)" }}
       >
         <div className="mx-auto grid max-w-7xl gap-12 px-6 lg:grid-cols-2 lg:items-center">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-surface-elevated/60 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur">
+          <div className="relative">
+            {/* Floating 3D AI Brain illustration */}
+            <div className="absolute -left-14 -top-14 w-24 h-24 pointer-events-none select-none animate-float-medium opacity-70">
+              <img src={brain3d} alt="3D AI Brain" className="w-full h-full object-contain filter drop-shadow-[0_10px_20px_rgba(6,182,212,0.25)]" />
+            </div>
+
+            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-surface-elevated/60 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur relative z-10">
               <Sparkles className="h-3 w-3 text-accent" /> AI Studio
             </div>
             <h2 className="mt-4 font-display text-4xl font-bold tracking-tight sm:text-5xl">
@@ -802,9 +810,13 @@ function Landing() {
       <section className="py-24">
         <div className="mx-auto max-w-5xl px-6">
           <div
-            className="relative overflow-hidden rounded-3xl border border-border p-12 text-center shadow-glow"
+            className="relative overflow-hidden rounded-3xl border border-border p-12 text-center shadow-glow group/cta cursor-pointer"
             style={{ background: "var(--gradient-primary)" }}
           >
+            {/* Floating 3D Rocket */}
+            <div className="absolute right-12 top-1/2 -translate-y-1/2 hidden md:block w-32 h-32 pointer-events-none select-none animate-float-slow transition-all duration-500 group-hover/cta:scale-110 group-hover/cta:rotate-6">
+              <img src={rocket3d} alt="3D Rocket Launch" className="w-full h-full object-contain filter drop-shadow-[0_15px_30px_rgba(244,63,94,0.45)]" />
+            </div>
             <h2 className="font-display text-4xl font-bold tracking-tight text-primary-foreground sm:text-5xl">
               Your social workflow, reinvented.
             </h2>

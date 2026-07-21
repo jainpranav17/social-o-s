@@ -34,6 +34,7 @@ import {
   Key,
   X,
 } from "lucide-react";
+import chat3d from "@/assets/3d-ai-chat.png";
 
 export const Route = createFileRoute("/_authenticated/publisher")({
   component: PublisherStudio,
@@ -289,14 +290,19 @@ function PublisherStudio() {
   });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 relative">
       {/* Header */}
-      <div>
-        <h1 className="font-display text-3xl font-bold tracking-tight">Publisher & Scheduler</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Upload videos & reels, craft AI copy, preview live mockup cards, and publish across your
-          channels.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display text-3xl font-bold tracking-tight">Publisher & Scheduler</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Upload videos & reels, craft AI copy, preview live mockup cards, and publish across your
+            channels.
+          </p>
+        </div>
+        <div className="hidden sm:block w-16 h-16 pointer-events-none select-none animate-float-slow -mt-2">
+          <img src={chat3d} alt="3D Chat" className="w-full h-full object-contain filter drop-shadow-[0_10px_20px_rgba(59,130,246,0.3)]" />
+        </div>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-12">

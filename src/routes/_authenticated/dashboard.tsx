@@ -15,6 +15,7 @@ import {
   Loader2,
   Send,
 } from "lucide-react";
+import target3d from "@/assets/3d-ai-target.png";
 import {
   AreaChart,
   Area,
@@ -247,12 +248,17 @@ function Dashboard() {
 
   return (
     <div className="space-y-8">
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 sm:flex sm:flex-wrap sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="font-display text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Welcome back. Here's what's happening across your channels.
-          </p>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 sm:flex sm:flex-wrap sm:justify-between relative">
+        <div className="flex items-center gap-4 min-w-0">
+          <div>
+            <h1 className="font-display text-3xl font-bold tracking-tight">Dashboard</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Welcome back. Here's what's happening across your channels.
+            </p>
+          </div>
+          <div className="hidden sm:block w-14 h-14 pointer-events-none select-none animate-float-slow">
+            <img src={target3d} alt="3D Target" className="w-full h-full object-contain filter drop-shadow-[0_10px_20px_rgba(6,182,212,0.3)]" />
+          </div>
         </div>
         <div className="flex gap-2">
           <Link
