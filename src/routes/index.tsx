@@ -57,6 +57,60 @@ function ThreadsIcon({ className }: { className?: string }) {
   );
 }
 
+function TiltCard({
+  children,
+  max = 8,
+  className,
+  style,
+  ...props
+}: {
+  children: React.ReactNode;
+  max?: number;
+  className?: string;
+  style?: React.CSSProperties;
+  [key: string]: any;
+}) {
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const [hovered, setHovered] = useState(false);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const normalizedX = (x / rect.width) * 2 - 1;
+    const normalizedY = (y / rect.height) * 2 - 1;
+    setTilt({
+      x: normalizedY * -max,
+      y: normalizedX * max,
+    });
+  };
+
+  const handleMouseLeave = () => {
+    setHovered(false);
+    setTilt({ x: 0, y: 0 });
+  };
+
+  return (
+    <div
+      className={className}
+      style={{
+        ...style,
+        transform: `perspective(1000px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale3d(${hovered ? 1.025 : 1}, ${hovered ? 1.025 : 1}, 1)`,
+        transformStyle: "preserve-3d",
+        transition: hovered ? "transform 0.1s ease-out" : "transform 0.5s ease-out",
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      {...props}
+    >
+      <div style={{ transform: "translateZ(25px)", transformStyle: "preserve-3d" }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 const platforms = [
   { name: "Instagram", icon: Instagram, color: "text-pink-600 dark:text-pink-400" },
   { name: "Facebook", icon: Facebook, color: "text-blue-600 dark:text-blue-400" },
@@ -576,11 +630,12 @@ function Landing() {
               obsessively fast.
             </p>
           </div>
-          <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {features.map((f) => (
-              <div
+              <TiltCard
                 key={f.title}
-                className="group relative rounded-2xl border border-border bg-card p-6 transition hover:-translate-y-0.5 hover:shadow-elegant"
+                max={5}
+                className="group relative rounded-2xl border border-border bg-card p-6 cursor-pointer hover:shadow-elegant transition-shadow duration-300"
               >
                 <div
                   className="grid h-11 w-11 place-items-center rounded-xl text-primary-foreground shadow-glow"
@@ -590,7 +645,7 @@ function Landing() {
                 </div>
                 <h3 className="mt-5 font-display text-lg font-semibold">{f.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{f.desc}</p>
-              </div>
+              </TiltCard>
             ))}
           </div>
         </div>
@@ -627,7 +682,7 @@ function Landing() {
               ))}
             </ul>
           </div>
-          <div className="glass rounded-2xl p-6 shadow-elegant">
+          <TiltCard max={8} className="glass rounded-2xl p-6 shadow-elegant cursor-pointer">
             <div className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
               <span className="h-2 w-2 rounded-full bg-accent" /> Generated caption · Instagram
             </div>
@@ -657,7 +712,7 @@ function Landing() {
                 </div>
               ))}
             </div>
-          </div>
+          </TiltCard>
         </div>
       </section>
 
