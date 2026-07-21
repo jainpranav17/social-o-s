@@ -703,6 +703,8 @@ function Landing() {
                 "Multiple variations at once",
                 "Virality & SEO scoring",
                 "Trending hashtag suggestions",
+                "One-click smart Call-to-Action suggestions",
+                "Multi-language translation in 30+ styles",
               ].map((t) => (
                 <li key={t} className="flex items-start gap-2">
                   <Check className="mt-0.5 h-4 w-4 text-accent" />
