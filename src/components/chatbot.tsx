@@ -1,12 +1,19 @@
 import { useState, useEffect, useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { MessageCircle, X, Send, Sparkles, Loader2, RefreshCw, Mic } from "lucide-react";
+import { MessageCircle, X, Send, Sparkles, Loader2, RefreshCw, Mic, Plus, FileText, Image, Video } from "lucide-react";
 import { askChatbot } from "@/lib/chat.functions";
 import { toast } from "sonner";
+
+interface AttachedFile {
+  name: string;
+  type: string;
+  size: number;
+}
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+  files?: AttachedFile[];
 }
 
 export function Chatbot() {
@@ -22,8 +29,27 @@ export function Chatbot() {
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const recognitionRef = useRef<any>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files);
+    const newAttached = files.map((f) => ({
+      name: f.name,
+      type: f.type,
+      size: f.size,
+    }));
+    setAttachedFiles((prev) => [...prev, ...newAttached]);
+    // Reset file input value
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const removeAttachedFile = (idx: number) => {
+    setAttachedFiles((prev) => prev.filter((_, i) => i !== idx));
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -88,20 +114,32 @@ export function Chatbot() {
   }, [messages, isOpen]);
 
   const handleSend = async (text: string) => {
-    if (!text.trim()) return;
+    if (!text.trim() && attachedFiles.length === 0) return;
 
-    const userMessage: Message = { role: "user", content: text };
+    const userMessage: Message = { 
+      role: "user", 
+      content: text,
+      files: attachedFiles.length > 0 ? attachedFiles : undefined
+    };
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
     setInputValue("");
+    setAttachedFiles([]);
     setIsLoading(true);
 
     try {
       // Send only roles and contents mapped correctly
-      const chatHistory = updatedMessages.map((m) => ({
-        role: m.role,
-        content: m.content,
-      }));
+      const chatHistory = updatedMessages.map((m) => {
+        let content = m.content;
+        if (m.files && m.files.length > 0) {
+          const filesStr = m.files.map(f => `[Attached File: ${f.name} (type: ${f.type})]`).join("\n");
+          content = `${filesStr}\n${content}`;
+        }
+        return {
+          role: m.role,
+          content: content,
+        };
+      });
       const res = await ask({ data: { messages: chatHistory } });
       
       setMessages((prev) => [
@@ -221,6 +259,26 @@ export function Chatbot() {
                         : "bg-muted text-foreground rounded-tl-none border border-border"
                     }`}
                   >
+                    {/* Render attached files previews if any */}
+                    {m.files && m.files.length > 0 && (
+                      <div className="mb-2 space-y-1">
+                        {m.files.map((file, fileIdx) => {
+                          const isImage = file.type.startsWith("image/");
+                          const isVideo = file.type.startsWith("video/");
+                          let FileIcon = FileText;
+                          if (isImage) FileIcon = Image;
+                          else if (isVideo) FileIcon = Video;
+                          
+                          return (
+                            <div key={fileIdx} className="flex items-center gap-2 rounded-lg bg-black/10 dark:bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-primary-foreground">
+                              <FileIcon className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate max-w-[150px]" title={file.name}>{file.name}</span>
+                              <span className="opacity-70 text-[10px]">({(file.size / 1024).toFixed(0)} KB)</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                     {m.content}
                   </div>
                 </div>
@@ -260,6 +318,33 @@ export function Chatbot() {
             </div>
           )}
 
+          {/* Attached Files Preview Bar */}
+          {attachedFiles.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 p-2 bg-muted/20 border-t border-border max-h-24 overflow-y-auto">
+              {attachedFiles.map((file, fileIdx) => {
+                const isImage = file.type.startsWith("image/");
+                const isVideo = file.type.startsWith("video/");
+                let FileIcon = FileText;
+                if (isImage) FileIcon = Image;
+                else if (isVideo) FileIcon = Video;
+                
+                return (
+                  <div key={fileIdx} className="flex items-center gap-1.5 bg-card border border-border px-2 py-1 rounded-full text-xs text-foreground pr-1">
+                    <FileIcon className="h-3 w-3 text-muted-foreground" />
+                    <span className="truncate max-w-[120px] font-medium">{file.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeAttachedFile(fileIdx)}
+                      className="rounded-full p-0.5 hover:bg-muted text-muted-foreground hover:text-foreground transition cursor-pointer"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {/* Input field area */}
           <form
             onSubmit={(e) => {
@@ -268,6 +353,22 @@ export function Chatbot() {
             }}
             className="flex items-center gap-2 border-t border-border p-3 bg-card"
           >
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              className="hidden"
+              multiple
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground transition active:scale-95 cursor-pointer"
+              title="Attach files, photos, or videos"
+              disabled={isLoading}
+            >
+              <Plus className="h-4.5 w-4.5" />
+            </button>
             <input
               type="text"
               value={inputValue}
@@ -291,7 +392,7 @@ export function Chatbot() {
             </button>
             <button
               type="submit"
-              disabled={!inputValue.trim() || isLoading}
+              disabled={(!inputValue.trim() && attachedFiles.length === 0) || isLoading}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground hover:opacity-90 active:scale-95 transition disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
             >
               <Send className="h-4 w-4" />
