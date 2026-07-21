@@ -85,6 +85,32 @@ def run_tests():
         assert len(context_outside) == 0, "Context chunks should be empty for unrelated query"
         print("[TEST] Groundedness Rules validated: Bot correctly refused to answer unrelated question.")
 
+        # 8. Test voice synthesis (TTS)
+        tts_output = "test_response.mp3"
+        if os.path.exists(tts_output):
+            try: os.remove(tts_output)
+            except Exception: pass
+        engine.synthesize_response("This is a test response", output_path=tts_output)
+        assert os.path.exists(tts_output), "Failed to generate speech audio output file"
+        print("[TEST] Text-to-Speech (TTS) synthesized response output successfully.")
+        
+        # 9. Test voice transcription query (STT)
+        dummy_audio = "test_instagram_query.wav"
+        with open(dummy_audio, "w") as f:
+            f.write("dummy audio content")
+        try:
+            q, r, c = engine.ask_voice(dummy_audio, session_id="test_session")
+            assert "instagram" in q.lower(), f"Unexpected transcribed query: {q}"
+            assert len(c) > 0, "Failed to retrieve relevant chunks via voice query transcription"
+            print("[TEST] Speech-to-Text (STT) query transcription and RAG route validated.")
+        finally:
+            if os.path.exists(dummy_audio):
+                try: os.remove(dummy_audio)
+                except Exception: pass
+            if os.path.exists(tts_output):
+                try: os.remove(tts_output)
+                except Exception: pass
+
         print("=" * 60)
         print("ALL RAG CHATBOT MODULE VERIFICATIONS COMPLETED SUCCESSFULLY")
         print("=" * 60)

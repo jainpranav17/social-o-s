@@ -32,6 +32,11 @@ class RAGConfig(BaseSettings):
     supabase_url: str = Field(default="", validation_alias="SUPABASE_URL")
     supabase_service_role_key: str = Field(default="", validation_alias="SUPABASE_SERVICE_ROLE_KEY")
 
+    # Audio Voice configurations
+    tts_model: str = Field(default="tts-1", validation_alias="TTS_MODEL")
+    tts_voice: str = Field(default="alloy", validation_alias="TTS_VOICE")
+    stt_model: str = Field(default="whisper-1", validation_alias="STT_MODEL")
+
     # Allow loading from environment variables directly
     model_config = SettingsConfigDict(
         env_file=".env",

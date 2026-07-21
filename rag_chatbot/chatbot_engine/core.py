@@ -10,12 +10,14 @@ from rag_chatbot.memory.session import get_session_memory
 from rag_chatbot.utilities.logger import log_query, log_retrieval, log_response, log_error
 from rag_chatbot.document_ingestion.pipeline import ingest_document
 from rag_chatbot.chunking.splitter import create_chunks
+from rag_chatbot.chatbot_engine.voice import RAGVoiceHandler
 
 class RAGChatbotEngine:
     def __init__(self):
         self.embeddings = get_embedding_provider()
         self.store = get_vector_store()
         self.memory = get_session_memory()
+        self.voice = RAGVoiceHandler()
         self.api_key = config.openai_api_key
         
         self.is_mock = not self.api_key
@@ -146,3 +148,16 @@ class RAGChatbotEngine:
         except Exception as e:
             log_error("Exception in query resolution loop", e)
             return "An internal error occurred while processing your request. Please check RAG configuration.", []
+
+    def synthesize_response(self, text: str, output_path: str = "response.mp3") -> str:
+        """Helper to generate voice speech file of LLM reply text."""
+        # Strip out markdown citations and bold symbols to keep spoken voice natural
+        clean_text = text.split("\n\n**Sources:**")[0]
+        clean_text = clean_text.replace("**", "").replace("*", "")
+        return self.voice.synthesize_text(clean_text, output_path)
+
+    def ask_voice(self, audio_path: str, session_id: str = "default_session") -> Tuple[str, str, List[Dict[str, Any]]]:
+        """Transcribes an input audio file and routes the text question into the RAG pipeline."""
+        question = self.voice.transcribe_audio(audio_path)
+        reply, chunks = self.ask(question, session_id)
+        return question, reply, chunks

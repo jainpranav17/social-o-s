@@ -17,6 +17,8 @@ def main():
     print("  /delete <doc_id>     - Delete document from vector database")
     print("  /clear               - Clear current session chat history")
     print("  /history             - Show conversation log history")
+    print("  /voice <on|off>      - Toggle automatic Text-to-Speech (TTS) voice generation")
+    print("  /speak <audio_path>  - Transcribe input audio file and query as question")
     print("  /exit                - Exit the CLI")
     print("  <any query text>     - Ask a RAG question directly")
     print("-" * 60)
@@ -30,6 +32,7 @@ def main():
         return
 
     session_id = "default_cli_session"
+    voice_mode = False
     
     while True:
         try:
@@ -87,6 +90,41 @@ def main():
                         role_label = "User" if turn["role"] == "user" else "Bot"
                         print(f"{role_label}: {turn['content']}")
                         
+            elif user_input.startswith("/voice"):
+                parts = user_input.split(" ", 1)
+                if len(parts) < 2:
+                    print(f"Voice generation is currently {'ON' if voice_mode else 'OFF'}. Use /voice <on|off> to toggle.")
+                    continue
+                val = parts[1].strip().lower()
+                if val == "on":
+                    voice_mode = True
+                    print("Automatic Text-to-Speech synthesis turned ON.")
+                elif val == "off":
+                    voice_mode = False
+                    print("Automatic Text-to-Speech synthesis turned OFF.")
+                else:
+                    print("Invalid value. Use /voice on or /voice off.")
+                    
+            elif user_input.startswith("/speak"):
+                parts = user_input.split(" ", 1)
+                if len(parts) < 2:
+                    print("Error: Please provide a voice audio file path. Example: /speak query.wav")
+                    continue
+                filepath = parts[1].strip()
+                if not os.path.exists(filepath):
+                    print(f"Error: File path does not exist: {filepath}")
+                    continue
+                print("Transcribing spoken audio and query resolving ...")
+                question, reply, chunks = engine.ask_voice(filepath, session_id=session_id)
+                print(f"Transcribed Question: {question}")
+                print("-" * 40)
+                print(reply)
+                print("-" * 40)
+                if voice_mode:
+                    print("Synthesizing speech output file ...")
+                    res = engine.synthesize_response(reply, "response.mp3")
+                    print(res)
+
             elif user_input.startswith("/"):
                 print(f"Unknown command: {user_input}. Type /exit to close, or ask a question directly.")
                 
@@ -97,6 +135,10 @@ def main():
                 print("-" * 40)
                 print(reply)
                 print("-" * 40)
+                if voice_mode:
+                    print("Synthesizing speech output file ...")
+                    res = engine.synthesize_response(reply, "response.mp3")
+                    print(res)
                 
         except KeyboardInterrupt:
             print("\nExiting RAG assistant. Goodbye!")
