@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { MessageCircle, X, Send, Sparkles, Loader2, RefreshCw } from "lucide-react";
+import { MessageCircle, X, Send, Sparkles, Loader2, RefreshCw, Mic } from "lucide-react";
 import { askChatbot } from "@/lib/chat.functions";
 import { toast } from "sonner";
 
@@ -21,10 +21,64 @@ export function Chatbot() {
   ]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const rec = new SpeechRecognition();
+      rec.continuous = false;
+      rec.interimResults = false;
+      rec.lang = "en-US";
+
+      rec.onstart = () => {
+        setIsListening(true);
+      };
+
+      rec.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setInputValue(transcript);
+      };
+
+      rec.onerror = (event: any) => {
+        console.error("Speech recognition error", event.error);
+        if (event.error === "not-allowed") {
+          toast.error("Microphone access denied. Please allow microphone permissions.");
+        } else {
+          toast.error("Error recognizing speech. Try again.");
+        }
+        setIsListening(false);
+      };
+
+      rec.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = rec;
+    }
+  }, []);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      toast.error("Speech recognition is not supported in this browser. Please try Chrome, Edge, or Safari.");
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+    } else {
+      try {
+        recognitionRef.current.start();
+      } catch (e) {
+        console.error("Failed to start speech recognition", e);
+      }
+    }
   };
 
   useEffect(() => {
@@ -218,10 +272,23 @@ export function Chatbot() {
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Ask anything about SocialOS..."
+              placeholder={isListening ? "Listening..." : "Ask anything about SocialOS..."}
               className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground"
               disabled={isLoading}
             />
+            <button
+              type="button"
+              onClick={toggleListening}
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition active:scale-95 cursor-pointer ${
+                isListening 
+                  ? "bg-red-500 text-white animate-pulse border-red-500" 
+                  : "bg-background text-muted-foreground border-border hover:bg-secondary hover:text-foreground"
+              }`}
+              title={isListening ? "Stop listening" : "Speak to assistant"}
+              disabled={isLoading}
+            >
+              <Mic className="h-4 w-4" />
+            </button>
             <button
               type="submit"
               disabled={!inputValue.trim() || isLoading}
