@@ -154,6 +154,7 @@ function ImageSlider() {
   ];
   const [current, setCurrent] = useState(0);
   const [hovered, setHovered] = useState(false);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     if (hovered) return;
@@ -163,24 +164,66 @@ function ImageSlider() {
     return () => clearInterval(timer);
   }, [hovered, slides.length]);
 
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    const rect = el.getBoundingClientRect();
+    
+    // Calculate cursor coordinate offset from element center
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Normalize coordinates to ranges -1 to 1
+    const normalizedX = (x / rect.width) * 2 - 1;
+    const normalizedY = (y / rect.height) * 2 - 1;
+    
+    // Tilt limit degrees
+    setTilt({
+      x: normalizedY * -8, // Rotate around X-axis
+      y: normalizedX * 8,  // Rotate around Y-axis
+    });
+  };
+
+  const handleMouseLeave = () => {
+    setHovered(false);
+    setTilt({ x: 0, y: 0 });
+  };
+
   return (
     <div
-      className="relative overflow-hidden rounded-2xl border border-border shadow-glow bg-surface"
+      className="relative overflow-hidden rounded-2xl border border-border shadow-glow bg-surface transition-all duration-300 ease-out"
+      style={{
+        transform: `perspective(1000px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale3d(${hovered ? 1.025 : 1}, ${hovered ? 1.025 : 1}, 1)`,
+        transformStyle: "preserve-3d",
+      }}
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
     >
       <div
         className="flex transition-transform duration-500 ease-in-out"
-        style={{ transform: `translateX(-${current * 100}%)` }}
+        style={{
+          transform: `translateX(-${current * 100}%)`,
+          transformStyle: "preserve-3d",
+        }}
       >
         {slides.map((slide, idx) => (
-          <div key={idx} className="w-full shrink-0">
+          <div
+            key={idx}
+            className="w-full shrink-0"
+            style={{
+              transform: "translateZ(35px)",
+              transformStyle: "preserve-3d",
+            }}
+          >
             <img
               src={slide.src}
               alt={slide.alt}
               width={1600}
               height={1200}
               className="w-full object-cover animate-fade-in"
+              style={{
+                transform: "translateZ(10px)",
+              }}
             />
           </div>
         ))}
@@ -190,6 +233,7 @@ function ImageSlider() {
       <button
         onClick={() => setCurrent((prev) => (prev - 1 + slides.length) % slides.length)}
         className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-surface-elevated/80 p-2 text-foreground backdrop-blur hover:bg-surface-elevated transition shadow-elegant cursor-pointer z-10"
+        style={{ transform: "translateZ(50px)" }}
         aria-label="Previous slide"
       >
         <ChevronLeft className="h-5 w-5" />
@@ -197,13 +241,17 @@ function ImageSlider() {
       <button
         onClick={() => setCurrent((prev) => (prev + 1) % slides.length)}
         className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-surface-elevated/80 p-2 text-foreground backdrop-blur hover:bg-surface-elevated transition shadow-elegant cursor-pointer z-10"
+        style={{ transform: "translateZ(50px)" }}
         aria-label="Next slide"
       >
         <ChevronRight className="h-5 w-5" />
       </button>
 
       {/* Slide Indicators */}
-      <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-2 z-10">
+      <div
+        className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-2 z-10"
+        style={{ transform: "translateZ(50px)" }}
+      >
         {slides.map((_, idx) => (
           <button
             key={idx}
