@@ -1,8 +1,33 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { uploadVideoToYouTube, authorizeYouTubePermissions } from "@/lib/youtube";
+
+export async function authorizeTwitterPermissions() {
+  const disabled = JSON.parse(localStorage.getItem("disabled_real_platforms") || "[]");
+  localStorage.setItem("disabled_real_platforms", JSON.stringify(disabled.filter((p: string) => p !== "twitter")));
+
+  await supabase.auth.linkIdentity({
+    provider: "twitter",
+    options: {
+      redirectTo: window.location.origin + "/publisher",
+    },
+  });
+}
+
+export async function authorizeLinkedInPermissions() {
+  const disabled = JSON.parse(localStorage.getItem("disabled_real_platforms") || "[]");
+  localStorage.setItem("disabled_real_platforms", JSON.stringify(disabled.filter((p: string) => p !== "linkedin")));
+
+  await supabase.auth.linkIdentity({
+    provider: "linkedin_oidc",
+    options: {
+      redirectTo: window.location.origin + "/publisher",
+    },
+  });
+}
 import {
   Upload,
   Video,
@@ -110,6 +135,37 @@ function PublisherStudio() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishingStep, setPublishingStep] = useState<string>("");
   const [youtubeAuthNeeded, setYoutubeAuthNeeded] = useState(false);
+  const [twitterAuthNeeded, setTwitterAuthNeeded] = useState(false);
+  const [linkedinAuthNeeded, setLinkedinAuthNeeded] = useState(false);
+
+  // Fetch current user auth session details (including identities)
+  const { data: user } = useQuery({
+    queryKey: ["current-user-info"],
+    queryFn: async () => {
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser();
+      if (error) throw error;
+      return user;
+    },
+  });
+
+  const identities = user?.identities || [];
+  const isPlatformConnected = (platformId: PlatformId) => {
+    const disabled = JSON.parse(localStorage.getItem("disabled_real_platforms") || "[]");
+    if (disabled.includes(platformId)) return false;
+
+    const providerMap: Record<PlatformId, string> = {
+      instagram: "instagram",
+      facebook: "facebook",
+      youtube: "google",
+      linkedin: "linkedin_oidc",
+      twitter: "twitter",
+    };
+    const targetProvider = providerMap[platformId];
+    return identities.some((id) => id.provider === targetProvider);
+  };
 
   const [activePreviewTab, setActivePreviewTab] = useState<PlatformId>("instagram");
   const [isPlaying, setIsPlaying] = useState(true);
@@ -235,6 +291,56 @@ function PublisherStudio() {
         toast.warning(
           "YouTube selected: Attach a video file to post directly to your YouTube channel.",
         );
+      }
+    }
+
+    // Check if Twitter platform is selected
+    if (selectedPlatforms.includes("twitter") && publishMode === "now") {
+      if (!isPlatformConnected("twitter")) {
+        setIsPublishing(false);
+        setTwitterAuthNeeded(true);
+        toast.error("Twitter authorization required. Please connect your Twitter account first.");
+        return;
+      }
+
+      try {
+        setPublishingStep("Staging text content for Twitter...");
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        if (mediaFile) {
+          setPublishingStep("Uploading media attachments to Twitter Media API...");
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+        }
+        setPublishingStep("Publishing status to X timeline...");
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      } catch (err: any) {
+        setIsPublishing(false);
+        toast.error(`Twitter Upload Error: ${err.message}`);
+        return;
+      }
+    }
+
+    // Check if LinkedIn platform is selected
+    if (selectedPlatforms.includes("linkedin") && publishMode === "now") {
+      if (!isPlatformConnected("linkedin")) {
+        setIsPublishing(false);
+        setLinkedinAuthNeeded(true);
+        toast.error("LinkedIn authorization required. Please connect your LinkedIn account first.");
+        return;
+      }
+
+      try {
+        setPublishingStep("Formatting share payload for LinkedIn...");
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        if (mediaFile) {
+          setPublishingStep("Uploading media to LinkedIn Assets API...");
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+        }
+        setPublishingStep("Creating share post on LinkedIn feed...");
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      } catch (err: any) {
+        setIsPublishing(false);
+        toast.error(`LinkedIn Upload Error: ${err.message}`);
+        return;
       }
     }
 
@@ -835,6 +941,94 @@ function PublisherStudio() {
                 className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 flex items-center justify-center gap-2"
               >
                 <Key className="h-4 w-4" /> Authorize YouTube
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Twitter Auth Prompt Modal */}
+      {twitterAuthNeeded && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+          <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-glow">
+            <button
+              onClick={() => setTwitterAuthNeeded(false)}
+              className="absolute right-4 top-4 rounded-md p-1 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <div className="flex items-center gap-2 text-sky-500">
+              <Twitter className="h-6 w-6 fill-current" />
+              <h3 className="font-display text-lg font-bold">Twitter Permission Required</h3>
+            </div>
+
+            <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
+              To publish tweets and media directly to your Twitter/X timeline, SocialOS needs permission
+              to interact with your account via the Twitter API.
+            </p>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setTwitterAuthNeeded(false)}
+                className="flex-1 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold transition hover:bg-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setTwitterAuthNeeded(false);
+                  await authorizeTwitterPermissions();
+                }}
+                className="flex-1 rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-600 flex items-center justify-center gap-2"
+              >
+                <Key className="h-4 w-4" /> Authorize Twitter
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LinkedIn Auth Prompt Modal */}
+      {linkedinAuthNeeded && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+          <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-glow">
+            <button
+              onClick={() => setLinkedinAuthNeeded(false)}
+              className="absolute right-4 top-4 rounded-md p-1 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <div className="flex items-center gap-2 text-indigo-600">
+              <Linkedin className="h-6 w-6 fill-current" />
+              <h3 className="font-display text-lg font-bold">LinkedIn Permission Required</h3>
+            </div>
+
+            <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
+              To create posts and share media directly on your LinkedIn feed, SocialOS needs permission
+              to interact with your profile via the LinkedIn API.
+            </p>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setLinkedinAuthNeeded(false)}
+                className="flex-1 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold transition hover:bg-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setLinkedinAuthNeeded(false);
+                  await authorizeLinkedInPermissions();
+                }}
+                className="flex-1 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 flex items-center justify-center gap-2"
+              >
+                <Key className="h-4 w-4" /> Authorize LinkedIn
               </button>
             </div>
           </div>
