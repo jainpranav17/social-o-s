@@ -22,13 +22,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { toast } from "sonner";
-// Static images removed — replaced with animated 3D panels (zero-lag CSS animation)
-import heart3d from "@/assets/3d-heart.png";
-import calendar3d from "@/assets/3d-calendar.png";
-import chart3d from "@/assets/3d-chart.png";
-import brain3d from "@/assets/3d-ai-brain.png";
-import rocket3d from "@/assets/3d-ai-rocket.png";
-import star3d from "@/assets/3d-ai-star.png";
+// All heavy PNG assets removed — replaced with CSS-only animations for zero-lag rendering
+import { useRef, useCallback } from "react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 export const Route = createFileRoute("/")({
@@ -74,43 +69,45 @@ function TiltCard({
   style?: React.CSSProperties;
   [key: string]: any;
 }) {
-  const [tilt, setTilt] = useState({ x: 0, y: 0 });
-  const [hovered, setHovered] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const rafRef = useRef<number | null>(null);
+  const hoveredRef = useRef(false);
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const normalizedX = (x / rect.width) * 2 - 1;
-    const normalizedY = (y / rect.height) * 2 - 1;
-    setTilt({
-      x: normalizedY * -max,
-      y: normalizedX * max,
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (rafRef.current) return; // throttle to 1 update per rAF
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      if (!ref.current) return;
+      const rect = ref.current.getBoundingClientRect();
+      const normalizedX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      const normalizedY = ((e.clientY - rect.top) / rect.height) * 2 - 1;
+      ref.current.style.transform = `perspective(900px) rotateX(${normalizedY * -max}deg) rotateY(${normalizedX * max}deg) scale3d(1.02,1.02,1)`;
     });
-  };
+  }, [max]);
 
-  const handleMouseLeave = () => {
-    setHovered(false);
-    setTilt({ x: 0, y: 0 });
-  };
+  const handleMouseLeave = useCallback(() => {
+    hoveredRef.current = false;
+    if (ref.current) {
+      ref.current.style.transform = "perspective(900px) rotateX(0deg) rotateY(0deg) scale3d(1,1,1)";
+    }
+  }, []);
 
   return (
     <div
+      ref={ref}
       className={className}
       style={{
         ...style,
-        transform: `perspective(1000px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale3d(${hovered ? 1.025 : 1}, ${hovered ? 1.025 : 1}, 1)`,
-        transformStyle: "preserve-3d",
-        transition: hovered ? "transform 0.1s ease-out" : "transform 0.5s ease-out",
+        willChange: "transform",
+        transition: "transform 0.4s ease-out",
+        transform: "perspective(900px) rotateX(0deg) rotateY(0deg)",
       }}
-      onMouseEnter={() => setHovered(true)}
+      onMouseEnter={() => { hoveredRef.current = true; }}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       {...props}
     >
-      <div style={{ transform: "translateZ(25px)", transformStyle: "preserve-3d" }}>
-        {children}
-      </div>
+      {children}
     </div>
   );
 }
@@ -715,21 +712,24 @@ function Landing() {
 
       {/* Hero */}
       <section className="relative overflow-hidden" style={{ background: "var(--gradient-hero)" }}>
-        {/* Floating 3D Icons */}
-        <div className="absolute left-[5%] top-[15%] hidden xl:block w-36 h-36 pointer-events-none select-none animate-float-slow">
-          <img src={heart3d} alt="3D Heart Icon" className="w-full h-full object-contain filter drop-shadow-[0_15px_30px_rgba(236,72,153,0.35)]" />
+        {/* Lightweight CSS orb decorations — no PNG downloads */}
+        <div className="pointer-events-none select-none absolute left-[4%] top-[12%] hidden xl:flex xl:items-center xl:justify-center w-28 h-28 animate-float-slow">
+          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-pink-500/40 to-rose-600/20 blur-sm border border-pink-400/20" />
+          <span className="absolute text-3xl" style={{ filter: "drop-shadow(0 4px 12px rgba(236,72,153,0.6))" }}>❤️</span>
         </div>
-        <div className="absolute right-[5%] top-[18%] hidden xl:block w-40 h-40 pointer-events-none select-none animate-float-medium">
-          <img src={calendar3d} alt="3D Calendar Icon" className="w-full h-full object-contain filter drop-shadow-[0_15px_30px_rgba(6,182,212,0.35)]" />
+        <div className="pointer-events-none select-none absolute right-[4%] top-[15%] hidden xl:flex xl:items-center xl:justify-center w-32 h-32 animate-float-medium">
+          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-cyan-500/40 to-blue-600/20 blur-sm border border-cyan-400/20" />
+          <span className="absolute text-4xl" style={{ filter: "drop-shadow(0 4px 12px rgba(6,182,212,0.6))" }}>📅</span>
         </div>
-        <div className="absolute left-[10%] bottom-[12%] hidden xl:block w-32 h-32 pointer-events-none select-none animate-float-fast">
-          <img src={chart3d} alt="3D Analytics Icon" className="w-full h-full object-contain filter drop-shadow-[0_15px_30px_rgba(16,185,129,0.35)]" />
+        <div className="pointer-events-none select-none absolute left-[9%] bottom-[10%] hidden xl:flex xl:items-center xl:justify-center w-24 h-24 animate-float-fast">
+          <div className="w-18 h-18 rounded-full bg-gradient-to-br from-emerald-500/40 to-teal-600/20 blur-sm border border-emerald-400/20" />
+          <span className="absolute text-3xl" style={{ filter: "drop-shadow(0 4px 12px rgba(16,185,129,0.6))" }}>📊</span>
         </div>
 
         <div className="mx-auto max-w-7xl px-6 pb-24 pt-20 lg:pt-28 relative z-10">
           <div className="mx-auto max-w-3xl text-center">
             <div className="mx-auto mb-6 inline-flex items-center gap-2.5 rounded-full border border-border bg-surface-elevated/60 px-4 py-1.5 text-xs font-semibold text-muted-foreground backdrop-blur">
-              <img src={star3d} alt="3D Star" className="h-4.5 w-4.5 object-contain animate-spin" style={{ animationDuration: "12s" }} />
+              <span className="text-sm" style={{ animationDuration: "12s" }}>⭐</span>
               Now in beta — free while we're building
             </div>
             <h1 className="font-display text-5xl font-bold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
@@ -760,36 +760,15 @@ function Landing() {
             </div>
           </div>
 
-          <div className="relative mx-auto mt-16 max-w-5xl group/slider">
-            {/* Pulsing Blue Background Glow */}
+          <div className="relative mx-auto mt-16 max-w-5xl">
+            {/* Subtle static glow — no blur-3xl, no mix-blend-screen */}
             <div
-              className="absolute -inset-10 rounded-full blur-3xl opacity-35 mix-blend-screen pointer-events-none -z-10"
-              style={{
-                background: "radial-gradient(circle, #00d2ff 0%, #0066ff 60%, transparent 100%)",
-                animation: "pulse-glow 5s ease-in-out infinite",
-              }}
+              className="absolute -inset-6 rounded-3xl opacity-20 pointer-events-none -z-10"
+              style={{ background: "radial-gradient(ellipse, #06b6d4 0%, #6366f1 50%, transparent 80%)" }}
             />
-
-            {/* Rotating Blue Neon Ring Behind */}
-            <div
-              className="absolute left-1/2 top-1/2 w-[112%] h-[112%] rounded-full opacity-35 border border-dashed border-cyan-400 pointer-events-none -z-20 mix-blend-screen"
-              style={{
-                animation: "spin-slow 25s linear infinite",
-              }}
-            />
-            
-            {/* Counter-Rotating Blue Neon Ring Behind */}
-            <div
-              className="absolute left-1/2 top-1/2 w-[105%] h-[105%] rounded-full opacity-20 border border-cyan-500/50 pointer-events-none -z-20 mix-blend-screen"
-              style={{
-                animation: "spin-reverse 18s linear infinite",
-              }}
-            />
-
-            {/* Moving Neon Light Beams (top & bottom border tracks) */}
-            <div className="absolute inset-x-8 -top-1 h-[2px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-80 pointer-events-none blur-[1px] animate-pulse" />
-            <div className="absolute inset-x-8 -bottom-1 h-[2px] bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-80 pointer-events-none blur-[1px] animate-pulse" />
-
+            {/* Simple top/bottom neon line accents */}
+            <div className="absolute inset-x-8 -top-px h-px bg-gradient-to-r from-transparent via-cyan-400/60 to-transparent pointer-events-none" />
+            <div className="absolute inset-x-8 -bottom-px h-px bg-gradient-to-r from-transparent via-violet-400/60 to-transparent pointer-events-none" />
             <ImageSlider />
           </div>
         </div>
