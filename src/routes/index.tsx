@@ -838,9 +838,10 @@ function Landing() {
       >
         <div className="mx-auto grid max-w-7xl gap-12 px-6 lg:grid-cols-2 lg:items-center">
           <div className="relative">
-            {/* Floating 3D AI Brain illustration */}
-            <div className="absolute -left-14 -top-14 w-24 h-24 pointer-events-none select-none animate-float-medium opacity-70">
-              <img src={brain3d} alt="3D AI Brain" className="w-full h-full object-contain filter drop-shadow-[0_10px_20px_rgba(6,182,212,0.25)]" />
+            {/* CSS orb replacing brain3d PNG */}
+            <div className="absolute -left-14 -top-14 w-24 h-24 pointer-events-none select-none animate-float-medium opacity-70 flex items-center justify-center">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-500/40 to-violet-600/20 blur-sm" />
+              <span className="absolute text-4xl" style={{ filter: "drop-shadow(0 4px 16px rgba(6,182,212,0.5))" }}>🧠</span>
             </div>
 
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-surface-elevated/60 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur relative z-10">
@@ -947,9 +948,9 @@ function Landing() {
             className="relative overflow-hidden rounded-3xl border border-border p-12 text-center shadow-glow group/cta cursor-pointer"
             style={{ background: "var(--gradient-primary)" }}
           >
-            {/* Floating 3D Rocket */}
-            <div className="absolute right-12 top-1/2 -translate-y-1/2 hidden md:block w-32 h-32 pointer-events-none select-none animate-float-slow transition-all duration-500 group-hover/cta:scale-110 group-hover/cta:rotate-6">
-              <img src={rocket3d} alt="3D Rocket Launch" className="w-full h-full object-contain filter drop-shadow-[0_15px_30px_rgba(244,63,94,0.45)]" />
+            {/* CSS emoji replacing rocket3d PNG */}
+            <div className="absolute right-12 top-1/2 -translate-y-1/2 hidden md:flex items-center justify-center w-32 h-32 pointer-events-none select-none animate-float-slow transition-all duration-500 group-hover/cta:scale-110 group-hover/cta:rotate-6">
+              <span className="text-7xl" style={{ filter: "drop-shadow(0 8px 24px rgba(244,63,94,0.6))" }}>🚀</span>
             </div>
             <h2 className="font-display text-4xl font-bold tracking-tight text-primary-foreground sm:text-5xl">
               Your social workflow, reinvented.

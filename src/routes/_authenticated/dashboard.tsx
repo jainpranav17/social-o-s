@@ -15,7 +15,7 @@ import {
   Loader2,
   Send,
 } from "lucide-react";
-import target3d from "@/assets/3d-ai-target.png";
+
 import {
   AreaChart,
   Area,
@@ -275,8 +275,8 @@ function Dashboard() {
               Welcome back. Here's what's happening across your channels.
             </p>
           </div>
-          <div className="hidden sm:block w-14 h-14 pointer-events-none select-none animate-float-slow">
-            <img src={target3d} alt="3D Target" className="w-full h-full object-contain filter drop-shadow-[0_10px_20px_rgba(6,182,212,0.3)]" />
+          <div className="hidden sm:flex items-center justify-center w-14 h-14 pointer-events-none select-none animate-float-slow">
+            <span className="text-4xl" style={{ filter: "drop-shadow(0 6px 16px rgba(6,182,212,0.5))" }}>🎯</span>
           </div>
         </div>
         <div className="flex gap-2">
