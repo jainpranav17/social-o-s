@@ -22,9 +22,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { toast } from "sonner";
-import heroImg from "@/assets/hero.jpg";
-import schedulerImg from "@/assets/slide-scheduler.png";
-import platformsImg from "@/assets/slide-platforms.png";
+// Static images removed — replaced with animated 3D panels (zero-lag CSS animation)
 import heart3d from "@/assets/3d-heart.png";
 import calendar3d from "@/assets/3d-calendar.png";
 import chart3d from "@/assets/3d-chart.png";
@@ -206,11 +204,177 @@ const contactSchema = z.object({
 
 type ContactFormInputs = z.infer<typeof contactSchema>;
 
+/* ─── Animated slide data ─────────────────────────────────────────── */
+const SLIDE_LABELS = [
+  "AI Dashboard",
+  "Post Scheduler",
+  "Platform Hub",
+];
+
+/* ─── Slide 1: AI Dashboard ──────────────────────────────────────── */
+function SlideAIDashboard() {
+  return (
+    <div className="w-full h-full flex flex-col gap-3 p-5 select-none">
+      {/* Top bar */}
+      <div className="flex items-center justify-between">
+        <div className="flex gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-red-500/80" />
+          <span className="h-2.5 w-2.5 rounded-full bg-yellow-400/80" />
+          <span className="h-2.5 w-2.5 rounded-full bg-green-400/80" />
+        </div>
+        <div className="flex gap-2 items-center">
+          <div className="h-1.5 w-16 rounded-full bg-white/10 animate-pulse" />
+          <div className="h-5 w-5 rounded-full bg-primary/30" />
+        </div>
+      </div>
+      {/* Stat cards row */}
+      <div className="grid grid-cols-4 gap-2">
+        {[
+          { label: "Reach", val: "124K", color: "from-cyan-500/30 to-blue-600/20" },
+          { label: "Posts", val: "48", color: "from-violet-500/30 to-purple-600/20" },
+          { label: "Likes", val: "8.2K", color: "from-pink-500/30 to-rose-600/20" },
+          { label: "Score", val: "91%", color: "from-emerald-500/30 to-teal-600/20" },
+        ].map((s) => (
+          <div key={s.label} className={`rounded-xl bg-gradient-to-br ${s.color} border border-white/10 p-2.5`}>
+            <div className="text-[9px] text-white/50 uppercase tracking-widest">{s.label}</div>
+            <div className="mt-1 text-base font-bold text-white">{s.val}</div>
+          </div>
+        ))}
+      </div>
+      {/* Area chart */}
+      <div className="flex-1 rounded-xl border border-white/10 bg-white/5 p-3 overflow-hidden relative">
+        <div className="text-[9px] text-white/40 uppercase tracking-widest mb-2">Virality Trend</div>
+        <svg viewBox="0 0 300 80" className="w-full h-full" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="gA" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.6" />
+              <stop offset="100%" stopColor="#06b6d4" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <path d="M0,60 C40,50 60,20 100,30 C140,40 160,10 200,15 C240,20 270,35 300,25 L300,80 L0,80Z" fill="url(#gA)" />
+          <path d="M0,60 C40,50 60,20 100,30 C140,40 160,10 200,15 C240,20 270,35 300,25" fill="none" stroke="#06b6d4" strokeWidth="2" />
+          {/* Animated dot */}
+          <circle r="4" fill="#06b6d4" filter="url(#glow)">
+            <animateMotion dur="3s" repeatCount="indefinite" path="M0,60 C40,50 60,20 100,30 C140,40 160,10 200,15 C240,20 270,35 300,25" />
+          </circle>
+          <defs>
+            <filter id="glow"><feGaussianBlur stdDeviation="2" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+          </defs>
+        </svg>
+      </div>
+      {/* Bottom bar charts */}
+      <div className="grid grid-cols-6 gap-1 h-12 items-end">
+        {[40, 65, 30, 80, 55, 90].map((h, i) => (
+          <div key={i} className="flex items-end justify-center">
+            <div
+              className="w-full rounded-t-sm bg-gradient-to-t from-violet-500/60 to-cyan-400/60"
+              style={{ height: `${h}%`, animationDelay: `${i * 0.1}s` }}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Slide 2: Post Scheduler ─────────────────────────────────────── */
+function SlideScheduler() {
+  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const events = [
+    { day: 0, label: "Instagram Story", color: "from-pink-500/70 to-rose-500/50" },
+    { day: 1, label: "LinkedIn Post", color: "from-blue-500/70 to-blue-700/50" },
+    { day: 2, label: "Tweet Thread", color: "from-sky-400/70 to-cyan-500/50" },
+    { day: 3, label: "YouTube Short", color: "from-red-500/70 to-red-700/50" },
+    { day: 4, label: "FB Campaign", color: "from-indigo-500/70 to-purple-600/50" },
+    { day: 5, label: "Threads Post", color: "from-emerald-500/70 to-teal-600/50" },
+  ];
+  return (
+    <div className="w-full h-full flex flex-col gap-3 p-5 select-none">
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-semibold text-white/80">📅 Content Calendar</div>
+        <div className="flex gap-1">
+          <div className="h-5 w-12 rounded-full bg-primary/30 text-[8px] flex items-center justify-center text-white/60">July</div>
+        </div>
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {days.map((d) => (
+          <div key={d} className="text-center text-[8px] text-white/30 uppercase tracking-widest pb-1">{d}</div>
+        ))}
+        {Array.from({ length: 28 }, (_, i) => (
+          <div
+            key={i}
+            className={`h-7 rounded-md text-[8px] flex items-center justify-center font-medium transition-all ${
+              [1, 3, 5, 8, 12, 19].includes(i)
+                ? "bg-primary/25 text-primary border border-primary/40"
+                : "bg-white/5 text-white/20"
+            }`}
+          >
+            {i + 1}
+          </div>
+        ))}
+      </div>
+      {/* Event list */}
+      <div className="flex flex-col gap-1.5 mt-1 flex-1 overflow-hidden">
+        {events.slice(0, 3).map((e, i) => (
+          <div key={i} className={`flex items-center gap-2 rounded-lg bg-gradient-to-r ${e.color} px-2.5 py-1.5 border border-white/10`}>
+            <div className="h-1.5 w-1.5 rounded-full bg-white/80" />
+            <div className="text-[9px] text-white/90 font-medium">{e.label}</div>
+            <div className="ml-auto text-[8px] text-white/40">9:00 AM</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Slide 3: Platform Hub ───────────────────────────────────────── */
+function SlidePlatformHub() {
+  const hubs = [
+    { name: "Instagram", connected: true, posts: 34, color: "#e1306c", icon: "📸" },
+    { name: "LinkedIn", connected: true, posts: 18, color: "#0077b5", icon: "💼" },
+    { name: "X / Twitter", connected: true, posts: 52, color: "#1da1f2", icon: "𝕏" },
+    { name: "YouTube", connected: false, posts: 0, color: "#ff0000", icon: "▶" },
+    { name: "Facebook", connected: true, posts: 12, color: "#1877f2", icon: "f" },
+    { name: "Threads", connected: false, posts: 0, color: "#000000", icon: "@" },
+  ];
+  return (
+    <div className="w-full h-full flex flex-col gap-3 p-5 select-none">
+      <div className="text-xs font-semibold text-white/80">🔗 Connected Platforms</div>
+      <div className="grid grid-cols-2 gap-2 flex-1">
+        {hubs.map((h) => (
+          <div
+            key={h.name}
+            className="rounded-xl border border-white/10 bg-white/5 p-3 flex items-center gap-3 hover:bg-white/10 transition-colors duration-300"
+          >
+            <div
+              className="h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
+              style={{ backgroundColor: h.color + "33", border: `1px solid ${h.color}55` }}
+            >
+              {h.icon}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[9px] font-semibold text-white/80 truncate">{h.name}</div>
+              <div className="text-[8px] text-white/40">{h.connected ? `${h.posts} posts` : "Not linked"}</div>
+            </div>
+            <div className={`h-2 w-2 rounded-full shrink-0 ${h.connected ? "bg-emerald-400" : "bg-white/20"}`} />
+          </div>
+        ))}
+      </div>
+      {/* AI badge */}
+      <div className="rounded-xl bg-gradient-to-r from-violet-600/30 to-cyan-500/20 border border-violet-400/20 px-3 py-2 flex items-center gap-2">
+        <span className="text-sm">✨</span>
+        <div className="text-[9px] text-white/70">AI suggests posting on <span className="text-primary font-semibold">Instagram</span> today at <span className="text-primary font-semibold">7 PM</span></div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Main Slider Shell ───────────────────────────────────────────── */
 function ImageSlider() {
   const slides = [
-    { src: heroImg, alt: "SocialOS dashboard preview - Overview" },
-    { src: schedulerImg, alt: "SocialOS dashboard preview - Post Scheduler" },
-    { src: platformsImg, alt: "SocialOS dashboard preview - Connected Platforms" },
+    { component: SlideAIDashboard, label: SLIDE_LABELS[0] },
+    { component: SlideScheduler, label: SLIDE_LABELS[1] },
+    { component: SlidePlatformHub, label: SLIDE_LABELS[2] },
   ];
   const [current, setCurrent] = useState(0);
   const [hovered, setHovered] = useState(false);
@@ -225,22 +389,10 @@ function ImageSlider() {
   }, [hovered, slides.length]);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const el = e.currentTarget;
-    const rect = el.getBoundingClientRect();
-    
-    // Calculate cursor coordinate offset from element center
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    // Normalize coordinates to ranges -1 to 1
-    const normalizedX = (x / rect.width) * 2 - 1;
-    const normalizedY = (y / rect.height) * 2 - 1;
-    
-    // Tilt limit degrees
-    setTilt({
-      x: normalizedY * -8, // Rotate around X-axis
-      y: normalizedX * 8,  // Rotate around Y-axis
-    });
+    const rect = e.currentTarget.getBoundingClientRect();
+    const normalizedX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    const normalizedY = ((e.clientY - rect.top) / rect.height) * 2 - 1;
+    setTilt({ x: normalizedY * -8, y: normalizedX * 8 });
   };
 
   const handleMouseLeave = () => {
@@ -248,80 +400,83 @@ function ImageSlider() {
     setTilt({ x: 0, y: 0 });
   };
 
+  const SlideComp = slides[current].component;
+
   return (
     <div
-      className="relative overflow-hidden rounded-2xl border border-border shadow-glow bg-surface transition-all duration-300 ease-out"
+      className="relative overflow-hidden rounded-2xl border border-white/10 shadow-glow transition-all duration-300 ease-out"
       style={{
+        background: "linear-gradient(135deg, #0f0c29cc, #302b63cc, #24243ecc)",
+        backdropFilter: "blur(24px)",
         transform: `perspective(1000px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale3d(${hovered ? 1.025 : 1}, ${hovered ? 1.025 : 1}, 1)`,
         transformStyle: "preserve-3d",
+        minHeight: 320,
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
     >
+      {/* Glow orbs */}
+      <div className="pointer-events-none absolute -top-20 -left-20 h-60 w-60 rounded-full bg-cyan-500/20 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-20 -right-20 h-60 w-60 rounded-full bg-violet-500/20 blur-3xl" />
+
+      {/* Scanline effect */}
       <div
-        className="flex transition-transform duration-500 ease-in-out"
+        className="pointer-events-none absolute inset-0 z-10 opacity-[0.03]"
         style={{
-          transform: `translateX(-${current * 100}%)`,
-          transformStyle: "preserve-3d",
+          backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, #fff 2px, #fff 4px)",
+        }}
+      />
+
+      {/* Slide content — animated fade */}
+      <div
+        key={current}
+        style={{
+          animation: "fadeSlideIn 0.5s ease-out forwards",
         }}
       >
-        {slides.map((slide, idx) => (
-          <div
-            key={idx}
-            className="w-full shrink-0"
-            style={{
-              transform: "translateZ(35px)",
-              transformStyle: "preserve-3d",
-            }}
-          >
-            <img
-              src={slide.src}
-              alt={slide.alt}
-              width={1600}
-              height={1200}
-              className="w-full object-cover animate-fade-in"
-              style={{
-                transform: "translateZ(10px)",
-              }}
-            />
-          </div>
-        ))}
+        <style>{`
+          @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateY(12px) scale(0.98); }
+            to   { opacity: 1; transform: translateY(0)   scale(1); }
+          }
+        `}</style>
+        <SlideComp />
       </div>
 
       {/* Navigation Arrows */}
       <button
         onClick={() => setCurrent((prev) => (prev - 1 + slides.length) % slides.length)}
-        className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-surface-elevated/80 p-2 text-foreground backdrop-blur hover:bg-surface-elevated transition shadow-elegant cursor-pointer z-10"
-        style={{ transform: "translateZ(50px)" }}
+        className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/10 backdrop-blur p-2 text-white hover:bg-white/20 transition shadow-elegant cursor-pointer z-20"
         aria-label="Previous slide"
       >
-        <ChevronLeft className="h-5 w-5" />
+        <ChevronLeft className="h-4 w-4" />
       </button>
       <button
         onClick={() => setCurrent((prev) => (prev + 1) % slides.length)}
-        className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-surface-elevated/80 p-2 text-foreground backdrop-blur hover:bg-surface-elevated transition shadow-elegant cursor-pointer z-10"
-        style={{ transform: "translateZ(50px)" }}
+        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/10 backdrop-blur p-2 text-white hover:bg-white/20 transition shadow-elegant cursor-pointer z-20"
         aria-label="Next slide"
       >
-        <ChevronRight className="h-5 w-5" />
+        <ChevronRight className="h-4 w-4" />
       </button>
 
-      {/* Slide Indicators */}
-      <div
-        className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-2 z-10"
-        style={{ transform: "translateZ(50px)" }}
-      >
-        {slides.map((_, idx) => (
-          <button
-            key={idx}
-            onClick={() => setCurrent(idx)}
-            className={`h-2 rounded-full transition-all cursor-pointer ${
-              current === idx ? "w-6 bg-primary" : "w-2 bg-muted-foreground/50"
-            }`}
-            aria-label={`Go to slide ${idx + 1}`}
-          />
-        ))}
+      {/* Slide label + Indicators */}
+      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-20">
+        <span className="rounded-full bg-white/10 backdrop-blur px-3 py-0.5 text-[9px] font-semibold uppercase tracking-widest text-white/70">
+          {slides[current].label}
+        </span>
+        <div className="flex gap-1.5">
+          {slides.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => setCurrent(idx)}
+              className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                current === idx ? "w-6 bg-primary" : "w-1.5 bg-white/30"
+              }`}
+              aria-label={`Go to slide ${idx + 1}`}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
