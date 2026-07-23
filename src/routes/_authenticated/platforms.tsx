@@ -98,34 +98,9 @@ const PLATFORMS: PlatformInfo[] = [
   },
 ];
 
-// Mapping of verified email addresses to their real social platform accounts
-const EMAIL_ACCOUNTS_MAP: Record<string, Record<PlatformId, string>> = {
-  "jainpranav1707@gmail.com": {
-    instagram: "@jainpranav17",
-    facebook: "Pranav Jain",
-    linkedin: "linkedin.com/in/jainpranav17",
-    twitter: "@jainpranav17",
-    youtube: "Pranav Jain",
-  },
-  "test@example.com": {
-    instagram: "@testuser",
-    facebook: "Test User",
-    linkedin: "linkedin.com/in/testuser",
-    twitter: "@testuser",
-    youtube: "Test Channel",
-  },
-};
-
 function PlatformsPage() {
   const qc = useQueryClient();
-  const [connections, setConnections] = useState<ConnectionsMap>({});
   const [disabledRealPlatforms, setDisabledRealPlatforms] = useState<string[]>([]);
-  const [activeModal, setActiveModal] = useState<PlatformInfo | null>(null);
-  const [linkingState, setLinkingState] = useState<"idle" | "authorizing" | "fetching" | "saving">(
-    "idle",
-  );
-  const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [isRealMode, setIsRealMode] = useState<boolean>(false);
 
   // Fetch current user auth session details (including identities)
   const { data: user, isLoading: loadingUser } = useQuery({
@@ -139,10 +114,6 @@ function PlatformsPage() {
       return user;
     },
   });
-
-  const userEmail = user?.email || "";
-  const platformAccounts = EMAIL_ACCOUNTS_MAP[userEmail];
-  const detectedHandle = activeModal ? platformAccounts?.[activeModal.id] : undefined;
 
   // Retrieve linked identities from Supabase
   const identities = user?.identities || [];
@@ -159,16 +130,8 @@ function PlatformsPage() {
     return identities.find((id) => id.provider === targetProvider);
   };
 
-  // Load existing connections and user choice for Mode & Disabled Real Platforms
+  // Load user choice for Disabled Real Platforms
   useEffect(() => {
-    const saved = localStorage.getItem("connected_platforms");
-    if (saved) {
-      try {
-        setConnections(JSON.parse(saved));
-      } catch (e) {
-        console.error("Error loading connections:", e);
-      }
-    }
     const savedDisabled = localStorage.getItem("disabled_real_platforms");
     if (savedDisabled) {
       try {
@@ -177,24 +140,7 @@ function PlatformsPage() {
         console.error("Error loading disabled real platforms:", e);
       }
     }
-    const savedMode = localStorage.getItem("connection_mode");
-    if (savedMode) {
-      setIsRealMode(savedMode === "real");
-    }
   }, []);
-
-  const toggleConnectionMode = () => {
-    const nextMode = !isRealMode;
-    setIsRealMode(nextMode);
-    localStorage.setItem("connection_mode", nextMode ? "real" : "demo");
-    qc.invalidateQueries({ queryKey: ["connected-platforms-count"] });
-  };
-
-  const saveConnections = (updated: ConnectionsMap) => {
-    setConnections(updated);
-    localStorage.setItem("connected_platforms", JSON.stringify(updated));
-    qc.invalidateQueries({ queryKey: ["connected-platforms-count"] });
-  };
 
   const saveDisabledRealPlatforms = (updated: string[]) => {
     setDisabledRealPlatforms(updated);
@@ -203,19 +149,13 @@ function PlatformsPage() {
   };
 
   const handleOpenConnect = (platform: PlatformInfo) => {
-    if (isRealMode) {
-      // If it was locally disabled, re-enable it
-      if (disabledRealPlatforms.includes(platform.id)) {
-        saveDisabledRealPlatforms(disabledRealPlatforms.filter((p) => p !== platform.id));
-        toast.success(`Re-connected ${platform.name}!`);
-        return;
-      }
-      handleRealConnect(platform);
-    } else {
-      setActiveModal(platform);
-      setLinkingState("idle");
-      setConnectionError(null);
+    // If it was locally disabled, re-enable it
+    if (disabledRealPlatforms.includes(platform.id)) {
+      saveDisabledRealPlatforms(disabledRealPlatforms.filter((p) => p !== platform.id));
+      toast.success(`Re-connected ${platform.name}!`);
+      return;
     }
+    handleRealConnect(platform);
   };
 
   // Real Supabase Identity Linkage
@@ -254,82 +194,35 @@ function PlatformsPage() {
   };
 
   const handleDisconnect = async (platformId: PlatformId) => {
-    if (isRealMode) {
-      const realConn = getRealConnection(platformId);
-      if (realConn) {
-        try {
-          toast.loading(`Disconnecting platform...`);
-          const { error } = await supabase.auth.unlinkIdentity(realConn);
-          if (error) {
-            // Handle primary identity unlinking restriction gracefully
-            if (error.message.includes("at least 1 identity")) {
-              saveDisabledRealPlatforms([...disabledRealPlatforms, platformId]);
-              toast.dismiss();
-              toast.success(`Disconnected ${platformId.toUpperCase()} from workspace.`);
-              return;
-            }
-            throw error;
+    const realConn = getRealConnection(platformId);
+    if (realConn) {
+      try {
+        toast.loading(`Disconnecting platform...`);
+        const { error } = await supabase.auth.unlinkIdentity(realConn);
+        if (error) {
+          // Handle primary identity unlinking restriction gracefully
+          if (error.message.includes("at least 1 identity")) {
+            saveDisabledRealPlatforms([...disabledRealPlatforms, platformId]);
+            toast.dismiss();
+            toast.success(`Disconnected ${platformId.toUpperCase()} from workspace.`);
+            return;
           }
-          toast.dismiss();
-          toast.success(`Unlinked identity successfully.`);
-          qc.invalidateQueries({ queryKey: ["current-user-info"] });
-          qc.invalidateQueries({ queryKey: ["connected-platforms-count"] });
-        } catch (e: any) {
-          toast.dismiss();
-          // Fallback to workspace disconnect if Supabase blocks primary identity removal
-          saveDisabledRealPlatforms([...disabledRealPlatforms, platformId]);
-          toast.success(`Disconnected ${platformId.toUpperCase()} from workspace.`);
+          throw error;
         }
-      } else {
+        toast.dismiss();
+        toast.success(`Unlinked identity successfully.`);
+        qc.invalidateQueries({ queryKey: ["current-user-info"] });
+        qc.invalidateQueries({ queryKey: ["connected-platforms-count"] });
+      } catch (e: any) {
+        toast.dismiss();
+        // Fallback to workspace disconnect if Supabase blocks primary identity removal
         saveDisabledRealPlatforms([...disabledRealPlatforms, platformId]);
         toast.success(`Disconnected ${platformId.toUpperCase()} from workspace.`);
       }
     } else {
-      const updated = { ...connections };
-      delete updated[platformId];
-      saveConnections(updated);
-      toast.success(`Disconnected from ${platformId.toUpperCase()}`);
+      saveDisabledRealPlatforms([...disabledRealPlatforms, platformId]);
+      toast.success(`Disconnected ${platformId.toUpperCase()} from workspace.`);
     }
-  };
-
-  // Mock Handshake Flow (Demo Mode)
-  const handleConfirmConnect = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!activeModal) return;
-
-    setConnectionError(null);
-    setLinkingState("authorizing");
-
-    setTimeout(() => {
-      setLinkingState("fetching");
-
-      setTimeout(() => {
-        if (!detectedHandle) {
-          setLinkingState("idle");
-          setConnectionError(
-            `Verification Failed: No registered ${activeModal.name} profile found under the active Google session ${userEmail}.`,
-          );
-          toast.error(`No account found for ${userEmail}`);
-          return;
-        }
-
-        setLinkingState("saving");
-
-        setTimeout(() => {
-          const updated = {
-            ...connections,
-            [activeModal.id]: {
-              username: detectedHandle,
-              connectedAt: new Date().toISOString(),
-            },
-          };
-          saveConnections(updated);
-          toast.success(`Successfully connected to ${activeModal.name}!`);
-          setActiveModal(null);
-          setLinkingState("idle");
-        }, 600);
-      }, 1000);
-    }, 800);
   };
 
   if (loadingUser) {
@@ -350,67 +243,32 @@ function PlatformsPage() {
             Manage your social media channels. Connected platforms enable scheduling and analytics.
           </p>
         </div>
-
-        {/* Mode Switcher */}
-        <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-2 text-xs font-semibold shadow-elegant">
-          <Sparkles className="h-4 w-4 text-accent" />
-          <span className="text-muted-foreground">Mode:</span>
-          <button
-            onClick={toggleConnectionMode}
-            className="flex items-center gap-1.5 transition hover:opacity-90"
-            title="Toggle between demo simulation and real Supabase OAuth connection"
-          >
-            <span className={isRealMode ? "text-muted-foreground" : "text-primary"}>Demo Mode</span>
-            {isRealMode ? (
-              <ToggleRight className="h-5 w-5 text-accent" />
-            ) : (
-              <ToggleLeft className="h-5 w-5 text-muted-foreground" />
-            )}
-            <span className={isRealMode ? "text-primary" : "text-muted-foreground"}>
-              Real OAuth
-            </span>
-          </button>
-        </div>
       </div>
 
-      {/* Helper Banner for Real Mode */}
-      {isRealMode && (
-        <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5 flex gap-3 text-sm leading-relaxed">
-          <Shield className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-          <div>
-            <span className="font-bold">Real OAuth Mode Active.</span> Real OAuth connects platforms
-            by redirecting you to their official sign-in screen via Supabase. YouTube works
-            immediately. For Instagram, Facebook, Twitter, and LinkedIn, make sure you have enabled
-            their providers in your **Supabase Dashboard &gt; Authentication &gt; Providers**!
-          </div>
+      {/* Helper Banner */}
+      <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5 flex gap-3 text-sm leading-relaxed">
+        <Shield className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+        <div>
+          <span className="font-bold">Account Linking Active.</span> Connect platforms by
+          redirecting to their official sign-in screen via Supabase. YouTube works
+          immediately. For Instagram, Facebook, Twitter, and LinkedIn, make sure you have enabled
+          their providers in your **Supabase Dashboard &gt; Authentication &gt; Providers**!
         </div>
-      )}
+      </div>
 
       {/* Cards list */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {PLATFORMS.map((platform) => {
-          let isConnected = false;
-          let username = "";
-          let linkedAt = "";
-
-          if (isRealMode) {
-            const realConn = getRealConnection(platform.id);
-            isConnected = !!realConn;
-            username =
-              realConn?.identity_data?.name ||
-              realConn?.identity_data?.full_name ||
-              realConn?.identity_data?.email ||
-              "Authorized Account";
-            linkedAt = realConn?.created_at
-              ? new Date(realConn.created_at).toLocaleDateString()
-              : new Date().toLocaleDateString();
-          } else {
-            isConnected = !!connections[platform.id];
-            username = connections[platform.id]?.username || "";
-            linkedAt = connections[platform.id]?.connectedAt
-              ? new Date(connections[platform.id].connectedAt).toLocaleDateString()
-              : "";
-          }
+          const realConn = getRealConnection(platform.id);
+          const isConnected = !!realConn;
+          const username =
+            realConn?.identity_data?.name ||
+            realConn?.identity_data?.full_name ||
+            realConn?.identity_data?.email ||
+            "Authorized Account";
+          const linkedAt = realConn?.created_at
+            ? new Date(realConn.created_at).toLocaleDateString()
+            : new Date().toLocaleDateString();
 
           return (
             <div
@@ -478,108 +336,6 @@ function PlatformsPage() {
           );
         })}
       </div>
-
-      {/* Connect modal (Demo Mode only) */}
-      {!isRealMode && activeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
-          <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-glow">
-            <button
-              onClick={() => linkingState === "idle" && setActiveModal(null)}
-              disabled={linkingState !== "idle"}
-              className="absolute right-4 top-4 rounded-md p-1 text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-50"
-            >
-              <X className="h-4 w-4" />
-            </button>
-
-            <div className="flex items-center gap-2 text-primary">
-              <Shield className="h-5 w-5" />
-              <h3 className="font-display text-lg font-bold">Secure OAuth Connection</h3>
-            </div>
-
-            <p className="mt-1 text-xs text-muted-foreground">
-              SocialOS will query the platform directory for an account linked to your device's
-              session.
-            </p>
-
-            <form onSubmit={handleConfirmConnect} className="mt-6 space-y-4">
-              {connectionError ? (
-                <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 flex gap-3 text-destructive">
-                  <AlertCircle className="h-5 w-5 shrink-0" />
-                  <div>
-                    <div className="text-sm font-bold">Account Verification Failed</div>
-                    <div className="mt-1 text-xs opacity-90">{connectionError}</div>
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-3">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>ACTIVE BROWSER SESSION</span>
-                    <span className="flex items-center gap-1 text-accent font-medium">
-                      <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" /> Scanning
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="grid h-10 w-10 place-items-center rounded-full bg-primary/10 text-primary font-bold">
-                      {userEmail[0]?.toUpperCase() || "U"}
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold font-mono text-foreground truncate max-w-[240px]">
-                        {userEmail}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Looking up associated {activeModal.name} account...
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {linkingState !== "idle" ? (
-                <div className="flex flex-col items-center justify-center py-4 space-y-3">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <span className="font-display text-xs font-semibold text-muted-foreground text-center">
-                    {linkingState === "authorizing" &&
-                      `Opening secure handshake with ${activeModal.name}...`}
-                    {linkingState === "fetching" &&
-                      `Checking registry for active accounts under ${userEmail}...`}
-                    {linkingState === "saving" && "Registering account access token..."}
-                  </span>
-                </div>
-              ) : (
-                <div className="flex gap-3 pt-2">
-                  {connectionError ? (
-                    <button
-                      type="button"
-                      onClick={() => setActiveModal(null)}
-                      className="flex-1 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold transition hover:bg-secondary"
-                    >
-                      Close
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setActiveModal(null)}
-                        className="flex-1 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold transition hover:bg-secondary"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 flex items-center justify-center gap-2"
-                        style={{ background: "var(--gradient-primary)" }}
-                      >
-                        <Key className="h-4 w-4" /> Link Account
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

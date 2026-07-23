@@ -34,6 +34,40 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 function Dashboard() {
+  // Fetch current user details
+  const { data: user, isLoading: loadingUser } = useQuery({
+    queryKey: ["current-user-info"],
+    queryFn: async () => {
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser();
+      if (error) throw error;
+      return user;
+    },
+  });
+
+  // Fetch user profile from Supabase
+  const { data: profile } = useQuery({
+    queryKey: ["user-profile", user?.id],
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", user.id)
+        .single();
+      if (error) return null;
+      return data;
+    },
+  });
+
+  const userEmail = user?.email || "";
+  const emailPrefix = userEmail.split("@")[0] || "User";
+  const rawName = profile?.display_name || emailPrefix;
+  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const displayName = rawName.split(/[\._-]/).map(capitalize).join(" ");
+
   // 1. Fetch total captions count
   const { data: totalCaptions = 0, isLoading: loadingTotal } = useQuery({
     queryKey: ["captions-total-count"],
@@ -90,43 +124,28 @@ function Dashboard() {
     },
   });
 
-  // 4. Fetch connected platforms count dynamically based on the connection mode
+  // 4. Fetch connected platforms count dynamically based on the connection mode (always real OAuth now)
   const { data: connectedCount = 0 } = useQuery({
     queryKey: ["connected-platforms-count"],
     queryFn: async () => {
-      const mode = localStorage.getItem("connection_mode") || "demo";
-
-      if (mode === "real") {
-        const {
-          data: { user },
-          error,
-        } = await supabase.auth.getUser();
-        if (error || !user) return 0;
-        const disabled = JSON.parse(localStorage.getItem("disabled_real_platforms") || "[]");
-        const identities = user.identities || [];
-        const platformToProviderMap: Record<string, string> = {
-          instagram: "instagram",
-          facebook: "facebook",
-          youtube: "google",
-          linkedin: "linkedin_oidc",
-          twitter: "twitter",
-        };
-        const activeProviders = Object.entries(platformToProviderMap)
-          .filter(([platformId]) => !disabled.includes(platformId))
-          .map(([, provider]) => provider);
-        return identities.filter((id) => activeProviders.includes(id.provider)).length;
-      } else {
-        const saved = localStorage.getItem("connected_platforms");
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            return Object.keys(parsed).length;
-          } catch {
-            return 0;
-          }
-        }
-      }
-      return 0;
+      const {
+        data: { user: currentUser },
+        error,
+      } = await supabase.auth.getUser();
+      if (error || !currentUser) return 0;
+      const disabled = JSON.parse(localStorage.getItem("disabled_real_platforms") || "[]");
+      const identities = currentUser.identities || [];
+      const platformToProviderMap: Record<string, string> = {
+        instagram: "instagram",
+        facebook: "facebook",
+        youtube: "google",
+        linkedin: "linkedin_oidc",
+        twitter: "twitter",
+      };
+      const activeProviders = Object.entries(platformToProviderMap)
+        .filter(([platformId]) => !disabled.includes(platformId))
+        .map(([, provider]) => provider);
+      return identities.filter((id) => activeProviders.includes(id.provider)).length;
     },
   });
 
@@ -236,7 +255,7 @@ function Dashboard() {
     },
   ];
 
-  const isLoading = loadingTotal || loadingPlatform || loadingScore;
+  const isLoading = loadingTotal || loadingPlatform || loadingScore || loadingUser;
 
   if (isLoading) {
     return (
@@ -251,7 +270,7 @@ function Dashboard() {
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 sm:flex sm:flex-wrap sm:justify-between relative">
         <div className="flex items-center gap-4 min-w-0">
           <div>
-            <h1 className="font-display text-3xl font-bold tracking-tight">Dashboard</h1>
+            <h1 className="font-display text-3xl font-bold tracking-tight">{displayName}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Welcome back. Here's what's happening across your channels.
             </p>
