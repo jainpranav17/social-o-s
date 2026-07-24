@@ -24,19 +24,23 @@ export function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
   const [isMaximized, setIsMaximized] = useState(true);
   const [user, setUser] = useState<any>(null);
-  const [isCollectingEmail, setIsCollectingEmail] = useState(false);
   const [leadId, setLeadId] = useState<string | null>(null);
   const [leadEmail, setLeadEmail] = useState<string | null>(null);
 
-  const getGreeting = (currentUser: any, collecting: boolean) => {
+  // Embedded Authentication states
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authName, setAuthName] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState("");
+
+  const getGreeting = (currentUser: any) => {
     if (currentUser) {
       const email = currentUser.email || "";
       const name = email.split("@")[0];
       const nameCap = name.charAt(0).toUpperCase() + name.slice(1);
       return `Hi, ${nameCap}! I'm your SocialOS AI Assistant. ☕⚡ How can I help you manage your social platforms, write captions, or schedule posts today?`;
-    }
-    if (collecting) {
-      return "Hi! I'm your SocialOS AI Assistant. ☕⚡ To get started, please enter your email address so we can keep you updated and save your session.";
     }
     return "Hi! I'm your SocialOS AI Assistant. ☕⚡ How can I help you manage your social platforms, write captions, or schedule posts today?";
   };
@@ -44,7 +48,7 @@ export function Chatbot() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: getGreeting(null, true),
+      content: getGreeting(null),
     },
   ]);
 
@@ -82,7 +86,6 @@ export function Chatbot() {
           if (existingLead) {
             setLeadId(existingLead.id);
             setLeadEmail(email);
-            setIsCollectingEmail(false);
           } else {
             // Create lead
             const { data: newLead } = await supabase
@@ -94,25 +97,14 @@ export function Chatbot() {
             if (newLead) {
               setLeadId(newLead.id);
               setLeadEmail(email);
-              setIsCollectingEmail(false);
             }
           }
         } catch (e) {
           console.error("Auth lead init failed:", e);
         }
       } else {
-        const cachedId = localStorage.getItem("chatbot_lead_id");
-        const cachedEmail = localStorage.getItem("chatbot_lead_email");
-
-        if (cachedId && cachedEmail) {
-          setLeadId(cachedId);
-          setLeadEmail(cachedEmail);
-          setIsCollectingEmail(false);
-        } else {
-          setLeadId(null);
-          setLeadEmail(null);
-          setIsCollectingEmail(true);
-        }
+        setLeadId(null);
+        setLeadEmail(null);
       }
     };
 
@@ -125,7 +117,7 @@ export function Chatbot() {
       setMessages([
         {
           role: "assistant",
-          content: getGreeting(user, isCollectingEmail),
+          content: getGreeting(user),
         },
       ]);
       return;
@@ -158,7 +150,7 @@ export function Chatbot() {
           setMessages([
             {
               role: "assistant",
-              content: getGreeting(user, false),
+              content: getGreeting(user),
             },
           ]);
         }
@@ -168,7 +160,65 @@ export function Chatbot() {
     };
 
     fetchChatHistory();
-  }, [leadId, isCollectingEmail]);
+  }, [leadId]);
+
+  const handleAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError("");
+    setAuthLoading(true);
+
+    const email = authEmail.trim();
+    const password = authPassword;
+
+    if (!email || !password) {
+      setAuthError("Please fill in all fields.");
+      setAuthLoading(false);
+      return;
+    }
+
+    try {
+      if (authMode === "login") {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) {
+          setAuthError(error.message);
+        } else {
+          toast.success("Successfully signed in!");
+          setAuthEmail("");
+          setAuthPassword("");
+        }
+      } else {
+        const { error, data } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: authName.trim() || undefined,
+            },
+          },
+        });
+        if (error) {
+          setAuthError(error.message);
+        } else {
+          if (data.session) {
+            toast.success("Account created and signed in!");
+          } else {
+            toast.success("Please check your email to confirm registration.");
+          }
+          setAuthEmail("");
+          setAuthPassword("");
+          setAuthName("");
+        }
+      }
+    } catch (e: any) {
+      console.error("Auth execution error:", e);
+      setAuthError("Connection failed. Please try again.");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
 
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -501,11 +551,6 @@ export function Chatbot() {
   };
 
   const startVoiceCall = () => {
-    if (isCollectingEmail) {
-      toast.warning("Please type and save your email address before initiating a voice call.");
-      return;
-    }
-
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       toast.error("Speech recognition is not supported in this browser. Please try Chrome, Edge, or Safari.");
@@ -586,111 +631,6 @@ export function Chatbot() {
   const handleSend = async (text: string) => {
     if (!text.trim() && attachedFiles.length === 0) return;
 
-    // 1. Email Collection Phase
-    if (isCollectingEmail) {
-      const email = text.trim();
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-      setMessages((prev) => [...prev, { role: "user", content: email }]);
-      setInputValue("");
-      setIsLoading(true);
-
-      if (!emailRegex.test(email)) {
-        setTimeout(() => {
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "assistant",
-              content: "That email address doesn't look quite right. Please enter a valid email address (e.g. you@company.com) so we can initialize your session.",
-            },
-          ]);
-          setIsLoading(false);
-        }, 600);
-        return;
-      }
-
-      try {
-        let existingId: string | null = null;
-
-        // Check if lead already exists
-        const { data: existingLead } = await supabase
-          .from("chatbot_leads")
-          .select("id")
-          .eq("email", email)
-          .maybeSingle();
-
-        if (existingLead) {
-          existingId = existingLead.id;
-        } else {
-          // Create new lead
-          const { data: newLead } = await supabase
-            .from("chatbot_leads")
-            .insert({ email })
-            .select("id")
-            .maybeSingle();
-
-          if (newLead) {
-            existingId = newLead.id;
-          }
-        }
-
-        if (existingId) {
-          localStorage.setItem("chatbot_lead_id", existingId);
-          localStorage.setItem("chatbot_lead_email", email);
-          setLeadEmail(email);
-          setLeadId(existingId);
-          setIsCollectingEmail(false);
-
-          // Retrieve last 7 days of history if returning user
-          const sevenDaysAgo = new Date();
-          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-          const { data: dbMessages } = await supabase
-            .from("chatbot_messages")
-            .select("role, content")
-            .eq("lead_id", existingId)
-            .gte("created_at", sevenDaysAgo.toISOString())
-            .order("created_at", { ascending: true });
-
-          setTimeout(() => {
-            if (dbMessages && dbMessages.length > 0) {
-              const formattedMessages: Message[] = dbMessages.map((msg) => ({
-                role: msg.role as "user" | "assistant",
-                content: msg.content,
-              }));
-              setMessages(formattedMessages);
-              toast.success("Welcome back! Loaded your recent chat history.");
-            } else {
-              setMessages((prev) => [
-                ...prev,
-                {
-                  role: "assistant",
-                  content: "Thanks! Your session is initialized. How can I help you manage your social media platforms today?",
-                },
-              ]);
-            }
-            setIsLoading(false);
-          }, 800);
-        } else {
-          throw new Error("Could not store email.");
-        }
-      } catch (e) {
-        console.error("Error creating guest lead:", e);
-        setTimeout(() => {
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "assistant",
-              content: "I ran into a problem saving your email. Please try entering it again.",
-            },
-          ]);
-          setIsLoading(false);
-        }, 600);
-      }
-      return;
-    }
-
-    // 2. Normal Chat Conversation Phase
     const userMessage: Message = { 
       role: "user", 
       content: text,
@@ -789,10 +729,6 @@ export function Chatbot() {
   };
 
   const handleSuggestionClick = (suggestion: string) => {
-    if (suggestion === "🔑 Sign In to Workspace") {
-      navigate({ to: "/auth" });
-      return;
-    }
     handleSend(suggestion);
   };
 
@@ -800,24 +736,18 @@ export function Chatbot() {
     setMessages([
       {
         role: "assistant",
-        content: getGreeting(user, isCollectingEmail),
+        content: getGreeting(user),
       },
     ]);
     stopSpeech();
     endVoiceCall();
   };
 
-  const suggestions = user
-    ? [
-        "How do I schedule a post?",
-        "Brainstorm caption ideas for tech launch",
-        "What platforms are supported?",
-      ]
-    : [
-        "🔑 Sign In to Workspace",
-        "What platforms are supported?",
-        "How do I schedule a post?",
-      ];
+  const suggestions = [
+    "How do I schedule a post?",
+    "Brainstorm caption ideas for tech launch",
+    "What platforms are supported?",
+  ];
 
 
   return (
@@ -875,7 +805,7 @@ export function Chatbot() {
               </div>
             </div>
              <div className="flex items-center gap-1.5">
-              {!isVoiceMode && (
+              {user && !isVoiceMode && (
                 <>
                   <button
                     onClick={startVoiceCall}
@@ -918,6 +848,22 @@ export function Chatbot() {
                   )}
                 </>
               )}
+              {user && isVoiceMode && (
+                <button
+                  onClick={() => {
+                    const newVal = !voiceSpeakerMuted;
+                    setVoiceSpeakerMuted(newVal);
+                    voiceSpeakerMutedRef.current = newVal;
+                    if (newVal && 'speechSynthesis' in window) {
+                      window.speechSynthesis.cancel();
+                    }
+                  }}
+                  className="rounded-lg p-1.5 hover:bg-white/10 text-white/90 hover:text-white transition cursor-pointer"
+                  title={voiceSpeakerMuted ? "Unmute Voice Agent output" : "Mute Voice Agent output"}
+                >
+                  {voiceSpeakerMuted ? <VolumeX className="h-3.5 w-3.5 text-red-400" /> : <Volume2 className="h-3.5 w-3.5" />}
+                </button>
+              )}
               <button
                 onClick={() => setIsMaximized(!isMaximized)}
                 className="rounded-lg p-1.5 hover:bg-white/10 text-white/90 hover:text-white transition cursor-pointer"
@@ -941,7 +887,103 @@ export function Chatbot() {
           </div>
 
           {/* Settings, Voice Call, or Chat View */}
-          {showSettings ? (
+          {!user ? (
+            <div className="flex-1 flex flex-col justify-center p-6 bg-card overflow-y-auto font-sans animate-fade-in">
+              <div className="max-w-md w-full mx-auto space-y-5">
+                <div className="text-center space-y-2">
+                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 mb-1">
+                    <Sparkles className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-lg font-bold text-foreground">
+                    {authMode === "login" ? "Welcome to SocialOS" : "Create your Account"}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    {authMode === "login" 
+                      ? "Sign in with your email to unlock your AI Assistant." 
+                      : "Register to save your chat logs and schedule posts."}
+                  </p>
+                </div>
+
+                {authError && (
+                  <div className="p-3 rounded-lg bg-red-500/15 border border-red-500/20 text-red-500 text-xs font-semibold leading-relaxed">
+                    {authError}
+                  </div>
+                )}
+
+                <form onSubmit={handleAuthSubmit} className="space-y-4">
+                  {authMode === "signup" && (
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Full Name</label>
+                      <input
+                        type="text"
+                        value={authName}
+                        onChange={(e) => setAuthName(e.target.value)}
+                        placeholder="Pranav Jain"
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground"
+                        disabled={authLoading}
+                      />
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Email Address</label>
+                    <input
+                      type="email"
+                      value={authEmail}
+                      onChange={(e) => setAuthEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground"
+                      disabled={authLoading}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Password</label>
+                    <input
+                      type="password"
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground"
+                      disabled={authLoading}
+                      required
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={authLoading}
+                    className="w-full flex items-center justify-center gap-2 h-10 rounded-lg text-primary-foreground font-semibold text-sm transition active:scale-95 cursor-pointer disabled:opacity-50"
+                    style={{ background: "var(--gradient-primary)" }}
+                  >
+                    {authLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : authMode === "login" ? (
+                      "Sign In"
+                    ) : (
+                      "Register"
+                    )}
+                  </button>
+                </form>
+
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode(authMode === "login" ? "signup" : "login");
+                      setAuthError("");
+                    }}
+                    className="text-xs text-primary hover:underline font-semibold cursor-pointer"
+                  >
+                    {authMode === "login"
+                      ? "Don't have an account? Sign Up"
+                      : "Already have an account? Sign In"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : showSettings ? (
             <div className="flex-1 flex flex-col p-5 bg-card overflow-y-auto font-sans animate-fade-in">
               {/* Account profile block */}
               <div className="flex items-center gap-2 mb-4 border-b border-border pb-3">
@@ -1390,7 +1432,7 @@ export function Chatbot() {
                   onClick={() => fileInputRef.current?.click()}
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground transition active:scale-95 cursor-pointer"
                   title="Attach files, photos, or videos"
-                  disabled={isLoading || isCollectingEmail}
+                  disabled={isLoading}
                 >
                   <Plus className="h-4.5 w-4.5" />
                 </button>
@@ -1398,7 +1440,7 @@ export function Chatbot() {
                   type="text"
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
-                  placeholder={isListening ? "Listening..." : isCollectingEmail ? "Enter your email address..." : "Ask anything about SocialOS..."}
+                  placeholder={isListening ? "Listening..." : "Ask anything about SocialOS..."}
                   className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground"
                   disabled={isLoading}
                 />
@@ -1411,7 +1453,7 @@ export function Chatbot() {
                       : "bg-background text-muted-foreground border-border hover:bg-secondary hover:text-foreground"
                   }`}
                   title={isListening ? "Stop listening" : "Speak to assistant"}
-                  disabled={isLoading || isCollectingEmail}
+                  disabled={isLoading}
                 >
                   <Mic className="h-4 w-4" />
                 </button>
