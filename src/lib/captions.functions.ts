@@ -11,6 +11,7 @@ const GenerateInput = z.object({
   platform: z
     .enum(["instagram", "facebook", "linkedin", "twitter", "youtube", "threads"])
     .default("instagram"),
+  apiKey: z.string().optional(),
 });
 
 const CaptionResult = z.object({
@@ -24,8 +25,8 @@ export const generateCaption = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((raw: unknown) => GenerateInput.parse(raw))
   .handler(async ({ data, context }) => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("AI is not configured. Please contact support.");
+    const key = data.apiKey || process.env.LOVABLE_API_KEY;
+    if (!key) throw new Error("AI is not configured. Please configure your LOVABLE_API_KEY in your .env file or enter a valid Lovable API Key in the Chatbot settings.");
 
     const systemPrompt = `You are an elite social media copywriter for ${data.platform}. Return ONLY valid JSON matching: {"caption": string, "hashtags": string[6-10], "cta": string, "score": integer 0-100 virality estimate}. Use tone: ${data.tone}. Include tasteful emojis where appropriate. Optimize length for ${data.platform}.`;
 

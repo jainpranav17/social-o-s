@@ -37,7 +37,10 @@ function CaptionStudio() {
   });
 
   const mutation = useMutation({
-    mutationFn: () => generate({ data: { topic, audience, tone, platform } }),
+    mutationFn: () => {
+      const apiKey = localStorage.getItem("lovable_api_key") || undefined;
+      return generate({ data: { topic, audience, tone, platform, apiKey } });
+    },
     onSuccess: () => {
       toast.success("Caption generated");
       qc.invalidateQueries({ queryKey: ["captions"] });

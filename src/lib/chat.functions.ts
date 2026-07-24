@@ -8,12 +8,58 @@ const MessageInput = z.object({
 
 const ChatInput = z.object({
   messages: z.array(MessageInput),
+  apiKey: z.string().optional(),
+  openaiApiKey: z.string().optional(),
 });
 
 export const askChatbot = createServerFn({ method: "POST" })
   .inputValidator((raw: unknown) => ChatInput.parse(raw))
   .handler(async ({ data }) => {
-    const key = process.env.LOVABLE_API_KEY;
+    const key = data.apiKey || process.env.LOVABLE_API_KEY;
+    const openaiKey = data.openaiApiKey || process.env.OPENAI_API_KEY;
+
+    const systemPrompt = `You are a helpful, professional, and witty AI assistant for SocialOS. 
+SocialOS is a premium all-in-one Social Media Operating System. 
+Features of SocialOS include:
+1. AI Caption Studio: Generate platform-perfect captions, hashtags, and CTAs.
+2. Unified Scheduling: Compose posts and schedule them across Instagram, Facebook, LinkedIn, X, and YouTube.
+3. Deep Analytics: Monitor reach, engagement, and platform performance.
+4. Platforms: Secure OAuth2 connection for multiple social profiles.
+
+Keep your answers relatively short, professional, and action-oriented. Feel free to use tasteful emojis.`;
+
+    if (!key && openaiKey) {
+      try {
+        const res = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${openaiKey}`,
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            messages: [
+              { role: "system", content: systemPrompt },
+              ...data.messages.map(m => ({ role: m.role, content: m.content })),
+            ],
+          }),
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          const reply = json?.choices?.[0]?.message?.content ?? "I'm sorry, I couldn't process that.";
+          return { reply };
+        } else {
+          const errText = await res.text();
+          console.error("OpenAI API error:", errText);
+          return { reply: `OpenAI API Error: ${res.status}. Please check your key or balance.` };
+        }
+      } catch (e: any) {
+        console.error("OpenAI fetch failed:", e);
+        return { reply: "Failed to connect to the OpenAI service. Please check your internet connection." };
+      }
+    }
+
     if (!key) {
       const lastUserMsg = [...data.messages].reverse().find(m => m.role === "user")?.content.toLowerCase() || "";
 
@@ -54,19 +100,9 @@ export const askChatbot = createServerFn({ method: "POST" })
       }
 
       return {
-        reply: "I am the SocialOS AI Assistant. Ask me a question about:\n• 📅 **Scheduling** posts\n• ✍️ Generating **captions**\n• 🔌 Connecting **platforms**\n• 📈 Viewing **analytics**\n\n*(Note: AI Gateway API Key is not configured in your .env file, so I'm assisting you in offline guide mode!)*"
+        reply: "I am the SocialOS AI Assistant. Ask me a question about:\n• 📅 **Scheduling** posts\n• ✍️ Generating **captions**\n• 🔌 Connecting **platforms**\n• 📈 Viewing **analytics**\n\n*(Note: Neither Lovable API Key nor OpenAI API Key is configured in your settings. Please enter an API key using the gear settings icon at the top right of this chat to ask any general question!)*"
       };
     }
-
-    const systemPrompt = `You are a helpful, professional, and witty AI assistant for SocialOS. 
-SocialOS is a premium all-in-one Social Media Operating System. 
-Features of SocialOS include:
-1. AI Caption Studio: Generate platform-perfect captions, hashtags, and CTAs.
-2. Unified Scheduling: Compose posts and schedule them across Instagram, Facebook, LinkedIn, X, and YouTube.
-3. Deep Analytics: Monitor reach, engagement, and platform performance.
-4. Platforms: Secure OAuth2 connection for multiple social profiles.
-
-Keep your answers relatively short, professional, and action-oriented. Feel free to use tasteful emojis.`;
 
     try {
       const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
