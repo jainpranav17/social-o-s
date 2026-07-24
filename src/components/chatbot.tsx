@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { MessageCircle, X, Send, Sparkles, Loader2, RefreshCw, Mic, Plus, FileText, Image, Video, Settings, Key, Eye, EyeOff, Maximize2, Minimize2, Volume2, VolumeX } from "lucide-react";
+import { MessageCircle, X, Send, Sparkles, Loader2, RefreshCw, Mic, Plus, FileText, Image, Video, Settings, Key, Eye, EyeOff, Maximize2, Minimize2, Volume2, VolumeX, PhoneCall, PhoneOff, MicOff } from "lucide-react";
 import { askChatbot } from "@/lib/chat.functions";
 import { toast } from "sonner";
 
@@ -48,6 +48,20 @@ export function Chatbot() {
   });
   const [activeSpeechIndex, setActiveSpeechIndex] = useState<number | null>(null);
 
+  // AI Voice Agent State Variables
+  const [isVoiceMode, setIsVoiceMode] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<"connecting" | "listening" | "speaking" | "thinking" | "error">("connecting");
+  const [voiceText, setVoiceText] = useState("");
+  const [voiceMicMuted, setVoiceMicMuted] = useState(false);
+  const [voiceSpeakerMuted, setVoiceSpeakerMuted] = useState(false);
+
+  const voiceIsActiveRef = useRef(false);
+  const voiceMicMutedRef = useRef(false);
+  const voiceSpeakerMutedRef = useRef(false);
+  const voiceRecognitionRef = useRef<any>(null);
+  const currentUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const voiceTranscriptRef = useRef("");
+
   const playSpeech = (text: string, index: number) => {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
@@ -75,6 +89,19 @@ export function Chatbot() {
     const savedOpenaiKey = localStorage.getItem("openai_api_key") || "";
     setLovableKey(savedLovableKey);
     setOpenaiKey(savedOpenaiKey);
+
+    return () => {
+      // Global cleanup
+      voiceIsActiveRef.current = false;
+      if (voiceRecognitionRef.current) {
+        try {
+          voiceRecognitionRef.current.abort();
+        } catch (e) {}
+      }
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -157,6 +184,223 @@ export function Chatbot() {
     }
   };
 
+  // AI Voice Agent Logic Methods
+  const startVoiceRecognition = () => {
+    if (!voiceIsActiveRef.current || voiceMicMutedRef.current) return;
+    
+    try {
+      if (voiceRecognitionRef.current) {
+        voiceRecognitionRef.current.abort();
+      }
+      
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (!SpeechRecognition) return;
+
+      const rec = new SpeechRecognition();
+      rec.continuous = false;
+      rec.interimResults = true;
+      rec.lang = "en-US";
+
+      rec.onstart = () => {
+        setVoiceStatus("listening");
+        voiceTranscriptRef.current = "";
+        setVoiceText("");
+      };
+
+      rec.onresult = (event: any) => {
+        let interimTranscript = "";
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            voiceTranscriptRef.current = event.results[i][0].transcript;
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
+        }
+        setVoiceText(voiceTranscriptRef.current || interimTranscript || "Listening...");
+      };
+
+      rec.onerror = (event: any) => {
+        console.error("Voice recognition error:", event.error);
+        if (event.error === "no-speech") {
+          return;
+        }
+        if (event.error === "not-allowed") {
+          toast.error("Microphone access denied.");
+          endVoiceCall();
+        }
+      };
+
+      rec.onend = () => {
+        if (!voiceIsActiveRef.current) return;
+
+        const finalText = voiceTranscriptRef.current.trim();
+        if (finalText) {
+          handleVoiceInput(finalText);
+        } else {
+          setTimeout(() => {
+            if (voiceIsActiveRef.current && !voiceMicMutedRef.current) {
+              startVoiceRecognition();
+            }
+          }, 300);
+        }
+      };
+
+      voiceRecognitionRef.current = rec;
+      rec.start();
+    } catch (e) {
+      console.error("Failed to start voice recognition:", e);
+    }
+  };
+
+  const speakVoiceResponse = (text: string) => {
+    if (!voiceIsActiveRef.current) return;
+
+    if (voiceSpeakerMutedRef.current || !('speechSynthesis' in window)) {
+      setVoiceStatus("listening");
+      setTimeout(() => {
+        startVoiceRecognition();
+      }, 1500);
+      return;
+    }
+
+    setVoiceStatus("speaking");
+    setVoiceText(text);
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    currentUtteranceRef.current = utterance;
+
+    utterance.onend = () => {
+      currentUtteranceRef.current = null;
+      if (voiceIsActiveRef.current) {
+        setVoiceText("");
+        startVoiceRecognition();
+      }
+    };
+
+    utterance.onerror = (e) => {
+      console.error("Utterance error:", e);
+      currentUtteranceRef.current = null;
+      if (voiceIsActiveRef.current) {
+        setVoiceText("");
+        startVoiceRecognition();
+      }
+    };
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const handleVoiceInput = async (text: string) => {
+    if (!text.trim()) return;
+
+    const userMessage: Message = { role: "user", content: text };
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
+    setVoiceStatus("thinking");
+    setVoiceText("Thinking...");
+
+    try {
+      const chatHistory = updatedMessages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+      const userApiKey = localStorage.getItem("lovable_api_key") || undefined;
+      const userOpenaiKey = localStorage.getItem("openai_api_key") || undefined;
+
+      const res = await ask({
+        data: {
+          messages: chatHistory,
+          apiKey: userApiKey,
+          openaiApiKey: userOpenaiKey,
+        },
+      });
+
+      setMessages((prev) => [...prev, { role: "assistant", content: res.reply }]);
+      speakVoiceResponse(res.reply);
+    } catch (e) {
+      console.error("Voice response error:", e);
+      setVoiceStatus("error");
+      setVoiceText("Sorry, I had trouble connecting.");
+      setTimeout(() => {
+        if (voiceIsActiveRef.current) {
+          speakVoiceResponse("Sorry, I encountered a connection issue. Let's try again.");
+        }
+      }, 2000);
+    }
+  };
+
+  const startVoiceCall = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast.error("Speech recognition is not supported in this browser. Please try Chrome, Edge, or Safari.");
+      return;
+    }
+
+    // Cancel standard speech synthesis
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setActiveSpeechIndex(null);
+
+    setIsVoiceMode(true);
+    setVoiceStatus("connecting");
+    setVoiceText("Connecting to SocialOS Voice Agent...");
+    voiceIsActiveRef.current = true;
+
+    setTimeout(() => {
+      speakVoiceResponse("Hi! I'm your SocialOS voice assistant. How can I help you manage your social media today?");
+    }, 600);
+  };
+
+  const endVoiceCall = () => {
+    voiceIsActiveRef.current = false;
+    setIsVoiceMode(false);
+    
+    if (voiceRecognitionRef.current) {
+      try {
+        voiceRecognitionRef.current.abort();
+      } catch (e) {}
+    }
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    currentUtteranceRef.current = null;
+    toast.info("Voice Call ended.");
+  };
+
+  const toggleVoiceMic = () => {
+    const newVal = !voiceMicMuted;
+    setVoiceMicMuted(newVal);
+    voiceMicMutedRef.current = newVal;
+    
+    if (newVal) {
+      if (voiceRecognitionRef.current) {
+        voiceRecognitionRef.current.abort();
+      }
+      setVoiceText("Microphone muted");
+    } else {
+      if (voiceStatus === "listening") {
+        startVoiceRecognition();
+      }
+    }
+  };
+
+  const toggleVoiceSpeaker = () => {
+    const newVal = !voiceSpeakerMuted;
+    setVoiceSpeakerMuted(newVal);
+    voiceSpeakerMutedRef.current = newVal;
+
+    if (newVal) {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      if (voiceStatus === "speaking") {
+        setVoiceStatus("listening");
+        startVoiceRecognition();
+      }
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       scrollToBottom();
@@ -178,7 +422,6 @@ export function Chatbot() {
     setIsLoading(true);
 
     try {
-      // Send only roles and contents mapped correctly
       const chatHistory = updatedMessages.map((m) => {
         let content = m.content;
         if (m.files && m.files.length > 0) {
@@ -249,6 +492,7 @@ export function Chatbot() {
       },
     ]);
     stopSpeech();
+    endVoiceCall();
   };
 
   const suggestions = [
@@ -256,6 +500,7 @@ export function Chatbot() {
     "Brainstorm caption ideas for tech launch",
     "What platforms are supported?",
   ];
+
 
   return (
     <div
@@ -312,37 +557,48 @@ export function Chatbot() {
               </div>
             </div>
              <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => {
-                  const newMuted = !isMuted;
-                  setIsMuted(newMuted);
-                  localStorage.setItem("chatbot_muted", String(newMuted));
-                  if (newMuted && 'speechSynthesis' in window) {
-                    window.speechSynthesis.cancel();
-                  }
-                }}
-                className="rounded-lg p-1.5 hover:bg-white/10 text-white/90 hover:text-white transition cursor-pointer"
-                title={isMuted ? "Unmute narration" : "Mute narration"}
-              >
-                {isMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
-              </button>
-              <button
-                onClick={() => setShowSettings(!showSettings)}
-                className={`rounded-lg p-1.5 transition cursor-pointer ${
-                  showSettings ? "bg-white/20 text-white" : "hover:bg-white/10 text-white/90 hover:text-white"
-                }`}
-                title="API Key Settings"
-              >
-                <Settings className="h-3.5 w-3.5" />
-              </button>
-              {!showSettings && (
-                <button
-                  onClick={clearChat}
-                  className="rounded-lg p-1.5 hover:bg-white/10 text-white/90 hover:text-white transition cursor-pointer"
-                  title="Reset conversation"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                </button>
+              {!isVoiceMode && (
+                <>
+                  <button
+                    onClick={startVoiceCall}
+                    className="rounded-lg p-1.5 hover:bg-white/10 text-white/90 hover:text-white transition cursor-pointer"
+                    title="Start Voice Call"
+                  >
+                    <PhoneCall className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      const newMuted = !isMuted;
+                      setIsMuted(newMuted);
+                      localStorage.setItem("chatbot_muted", String(newMuted));
+                      if (newMuted && 'speechSynthesis' in window) {
+                        window.speechSynthesis.cancel();
+                      }
+                    }}
+                    className="rounded-lg p-1.5 hover:bg-white/10 text-white/90 hover:text-white transition cursor-pointer"
+                    title={isMuted ? "Unmute narration" : "Mute narration"}
+                  >
+                    {isMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+                  </button>
+                  <button
+                    onClick={() => setShowSettings(!showSettings)}
+                    className={`rounded-lg p-1.5 transition cursor-pointer ${
+                      showSettings ? "bg-white/20 text-white" : "hover:bg-white/10 text-white/90 hover:text-white"
+                    }`}
+                    title="API Key Settings"
+                  >
+                    <Settings className="h-3.5 w-3.5" />
+                  </button>
+                  {!showSettings && (
+                    <button
+                      onClick={clearChat}
+                      className="rounded-lg p-1.5 hover:bg-white/10 text-white/90 hover:text-white transition cursor-pointer"
+                      title="Reset conversation"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </>
               )}
               <button
                 onClick={() => setIsMaximized(!isMaximized)}
@@ -356,6 +612,7 @@ export function Chatbot() {
                   setIsOpen(false);
                   setIsMaximized(false);
                   stopSpeech();
+                  endVoiceCall();
                 }}
                 className="rounded-lg p-1.5 hover:bg-white/10 text-white/90 hover:text-white transition cursor-pointer"
                 title="Close chat"
@@ -365,7 +622,7 @@ export function Chatbot() {
             </div>
           </div>
 
-          {/* Settings or Chat View */}
+          {/* Settings, Voice Call, or Chat View */}
           {showSettings ? (
             <div className="flex-1 flex flex-col p-5 bg-card overflow-y-auto font-sans">
               <div className="flex items-center gap-2 mb-4 border-b border-border pb-3">
@@ -458,6 +715,163 @@ export function Chatbot() {
                   className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted active:scale-[0.98] transition cursor-pointer"
                 >
                   Cancel
+                </button>
+              </div>
+            </div>
+          ) : isVoiceMode ? (
+            <div className="flex-1 flex flex-col items-center justify-between p-6 bg-gradient-to-b from-card to-background relative overflow-hidden font-sans">
+              {/* Decorative background glow */}
+              <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+              
+              {/* Agent info */}
+              <div className="text-center z-10 mt-2">
+                <h3 className="font-semibold text-lg text-foreground tracking-tight">SocialOS Voice Agent</h3>
+                <p className="text-[10px] font-medium uppercase tracking-wider text-primary mt-1 flex items-center justify-center gap-1.5">
+                  {voiceStatus === "connecting" && (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Connecting...
+                    </>
+                  )}
+                  {voiceStatus === "listening" && (
+                    <>
+                      <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                      Listening...
+                    </>
+                  )}
+                  {voiceStatus === "speaking" && (
+                    <>
+                      <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                      Speaking...
+                    </>
+                  )}
+                  {voiceStatus === "thinking" && (
+                    <>
+                      <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                      Thinking...
+                    </>
+                  )}
+                  {voiceStatus === "error" && (
+                    <>
+                      <span className="h-2 w-2 rounded-full bg-red-500" />
+                      Connection error
+                    </>
+                  )}
+                </p>
+              </div>
+
+              {/* Avatar and Radar Glow */}
+              <div className="relative flex items-center justify-center w-32 h-32 my-4 z-10">
+                {voiceStatus === "listening" && !voiceMicMuted && (
+                  <>
+                    <div className="absolute inset-0 rounded-full bg-emerald-500/15 animate-radar-pulse" style={{ animationDelay: "0s" }} />
+                    <div className="absolute inset-0 rounded-full bg-emerald-500/10 animate-radar-pulse" style={{ animationDelay: "0.8s" }} />
+                  </>
+                )}
+                {voiceStatus === "speaking" && (
+                  <>
+                    <div className="absolute inset-0 rounded-full bg-primary/15 animate-radar-pulse" style={{ animationDelay: "0s" }} />
+                    <div className="absolute inset-0 rounded-full bg-primary/10 animate-radar-pulse" style={{ animationDelay: "0.8s" }} />
+                  </>
+                )}
+                {voiceStatus === "thinking" && (
+                  <>
+                    <div className="absolute inset-0 rounded-full bg-blue-500/15 animate-radar-pulse" style={{ animationDelay: "0s" }} />
+                    <div className="absolute inset-0 rounded-full bg-blue-500/10 animate-radar-pulse" style={{ animationDelay: "0.8s" }} />
+                  </>
+                )}
+                
+                <div 
+                  className={`relative z-10 flex items-center justify-center w-22 h-22 rounded-full text-white shadow-xl transition-all duration-500 ${
+                    voiceStatus === "listening" && !voiceMicMuted
+                      ? "bg-emerald-500 shadow-emerald-500/30 scale-105"
+                      : voiceStatus === "speaking"
+                      ? "bg-primary shadow-primary/30 scale-105"
+                      : voiceStatus === "thinking"
+                      ? "bg-blue-500 shadow-blue-500/30"
+                      : "bg-muted text-muted-foreground border border-border"
+                  }`}
+                >
+                  {voiceStatus === "listening" && !voiceMicMuted && <Mic className="h-9 w-9 animate-pulse" />}
+                  {voiceStatus === "listening" && voiceMicMuted && <MicOff className="h-9 w-9 text-red-500" />}
+                  {voiceStatus === "speaking" && <Volume2 className="h-9 w-9" />}
+                  {voiceStatus === "thinking" && <Loader2 className="h-9 w-9 animate-spin" />}
+                  {(voiceStatus === "connecting" || voiceStatus === "error") && <RefreshCw className="h-9 w-9 animate-spin" />}
+                </div>
+              </div>
+
+              {/* Dynamic Waveform Visualizer */}
+              <div className="flex items-end justify-center gap-1.5 h-16 w-full max-w-[220px] z-10 mb-2">
+                {Array.from({ length: 11 }).map((_, i) => {
+                  let animationClass = "";
+                  if (voiceStatus === "speaking") {
+                    animationClass = "animate-voice-speaking";
+                  } else if (voiceStatus === "listening" && !voiceMicMuted) {
+                    animationClass = "animate-voice-listening";
+                  } else if (voiceStatus === "thinking") {
+                    animationClass = "animate-voice-thinking";
+                  }
+
+                  const barColors = 
+                    voiceStatus === "listening" && !voiceMicMuted
+                      ? "bg-emerald-500"
+                      : voiceStatus === "thinking"
+                      ? "bg-blue-500"
+                      : "bg-gradient-to-t from-primary to-accent";
+
+                  return (
+                    <div
+                      key={i}
+                      className={`w-1.5 rounded-full transition-all duration-300 min-h-[6px] ${barColors} ${animationClass}`}
+                      style={{
+                        height: "15%",
+                        animationDelay: `${i * 0.08}s`,
+                      }}
+                    />
+                  );
+                })}
+              </div>
+
+              {/* Real-time Subtitle Display */}
+              <div className="w-full max-w-md px-4 py-3 bg-muted/30 border border-border/40 rounded-2xl text-center text-xs text-muted-foreground/90 italic min-h-[70px] flex items-center justify-center z-10 px-6 leading-relaxed">
+                {voiceText || (voiceStatus === "listening" ? "Say something..." : "Waiting for agent...")}
+              </div>
+
+              {/* Action Buttons Deck */}
+              <div className="flex items-center gap-6 mt-4 z-10">
+                {/* Mute Mic */}
+                <button
+                  onClick={toggleVoiceMic}
+                  className={`flex items-center justify-center w-12 h-12 rounded-full border transition-all duration-200 active:scale-95 cursor-pointer ${
+                    voiceMicMuted
+                      ? "bg-red-500/10 border-red-500/30 text-red-500 hover:bg-red-500/20"
+                      : "bg-muted hover:bg-secondary text-muted-foreground hover:text-foreground border-border"
+                  }`}
+                  title={voiceMicMuted ? "Unmute Microphone" : "Mute Microphone"}
+                >
+                  {voiceMicMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                </button>
+
+                {/* Hang Up */}
+                <button
+                  onClick={endVoiceCall}
+                  className="flex items-center justify-center w-14 h-14 rounded-full bg-red-600 hover:bg-red-500 active:scale-90 text-white shadow-xl shadow-red-600/20 hover:shadow-red-500/30 transition-all duration-200 cursor-pointer"
+                  title="End Voice Call"
+                >
+                  <PhoneOff className="h-6 w-6" />
+                </button>
+
+                {/* Mute Speaker */}
+                <button
+                  onClick={toggleVoiceSpeaker}
+                  className={`flex items-center justify-center w-12 h-12 rounded-full border transition-all duration-200 active:scale-95 cursor-pointer ${
+                    voiceSpeakerMuted
+                      ? "bg-orange-500/10 border-orange-500/30 text-orange-500 hover:bg-orange-500/20"
+                      : "bg-muted hover:bg-secondary text-muted-foreground hover:text-foreground border-border"
+                  }`}
+                  title={voiceSpeakerMuted ? "Unmute Speaker" : "Mute Speaker"}
+                >
+                  {voiceSpeakerMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
                 </button>
               </div>
             </div>

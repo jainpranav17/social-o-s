@@ -233,3 +233,58 @@
 @utility animate-float-fast {
   animation: float-slow 5s ease-in-out infinite;
 }
+
+@keyframes voice-speaking {
+  0%, 100% {
+    transform: scaleY(0.15);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes voice-listening {
+  0%, 100% {
+    transform: scaleY(0.1);
+  }
+  50% {
+    transform: scaleY(0.4);
+  }
+}
+
+@keyframes voice-thinking {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes radar-pulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+@utility animate-voice-speaking {
+  animation: voice-speaking 0.8s ease-in-out infinite;
+}
+
+@utility animate-voice-listening {
+  animation: voice-listening 1.2s ease-in-out infinite;
+}
+
+@utility animate-voice-thinking {
+  animation: voice-thinking 1s ease-in-out infinite;
+}
+
+@utility animate-radar-pulse {
+  animation: radar-pulse 2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
