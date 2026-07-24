@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { useNavigate } from "@tanstack/react-router";
 import { MessageCircle, X, Send, Sparkles, Loader2, RefreshCw, Mic, Plus, FileText, Image, Video, Settings, Key, Eye, EyeOff, Maximize2, Minimize2, Volume2, VolumeX, PhoneCall, PhoneOff, MicOff } from "lucide-react";
 import { askChatbot } from "@/lib/chat.functions";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AttachedFile {
   name: string;
@@ -18,15 +20,59 @@ interface Message {
 
 export function Chatbot() {
   const ask = useServerFn(askChatbot);
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [isMaximized, setIsMaximized] = useState(true);
+  const [user, setUser] = useState<any>(null);
+
+  const getGreeting = (currentUser: any) => {
+    if (currentUser) {
+      const email = currentUser.email || "";
+      const name = email.split("@")[0];
+      const nameCap = name.charAt(0).toUpperCase() + name.slice(1);
+      return `Hi, ${nameCap}! I'm your SocialOS AI Assistant. ☕⚡ How can I help you manage your social platforms, write captions, or schedule posts today?`;
+    }
+    return "Hi! I'm your SocialOS AI Assistant. ☕⚡ Please sign in to unlock scheduling, AI Caption Studio, and dashboard analytics. How can I help you today?";
+  };
+
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content:
-        "Hi! I'm your SocialOS AI Assistant. ☕⚡ How can I help you manage your social platforms, write captions, or schedule posts today?",
+      content: getGreeting(null),
     },
   ]);
+
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // Update initial greeting when user session changes
+  useEffect(() => {
+    setMessages((prev) => {
+      if (prev.length === 1 && prev[0].role === "assistant") {
+        return [
+          {
+            role: "assistant",
+            content: getGreeting(user),
+          },
+        ];
+      }
+      return prev;
+    });
+  }, [user]);
+
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -480,6 +526,10 @@ export function Chatbot() {
   };
 
   const handleSuggestionClick = (suggestion: string) => {
+    if (suggestion === "🔑 Sign In to Workspace") {
+      navigate({ to: "/auth" });
+      return;
+    }
     handleSend(suggestion);
   };
 
@@ -487,19 +537,24 @@ export function Chatbot() {
     setMessages([
       {
         role: "assistant",
-        content:
-          "Hi! I'm your SocialOS AI Assistant. How can I help you manage your social platforms, write captions, or schedule posts today?",
+        content: getGreeting(user),
       },
     ]);
     stopSpeech();
     endVoiceCall();
   };
 
-  const suggestions = [
-    "How do I schedule a post?",
-    "Brainstorm caption ideas for tech launch",
-    "What platforms are supported?",
-  ];
+  const suggestions = user
+    ? [
+        "How do I schedule a post?",
+        "Brainstorm caption ideas for tech launch",
+        "What platforms are supported?",
+      ]
+    : [
+        "🔑 Sign In to Workspace",
+        "What platforms are supported?",
+        "How do I schedule a post?",
+      ];
 
 
   return (
@@ -624,7 +679,48 @@ export function Chatbot() {
 
           {/* Settings, Voice Call, or Chat View */}
           {showSettings ? (
-            <div className="flex-1 flex flex-col p-5 bg-card overflow-y-auto font-sans">
+            <div className="flex-1 flex flex-col p-5 bg-card overflow-y-auto font-sans animate-fade-in">
+              {/* Account profile block */}
+              <div className="flex items-center gap-2 mb-4 border-b border-border pb-3">
+                <Settings className="h-4.5 w-4.5 text-primary" />
+                <h3 className="font-semibold text-sm text-foreground">Account Profile</h3>
+              </div>
+
+              {user ? (
+                <div className="mb-6 p-3 bg-muted/40 border border-border rounded-xl flex items-center justify-between gap-3">
+                  <div className="truncate">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Signed In As</p>
+                    <p className="text-xs font-semibold text-foreground truncate" title={user.email}>{user.email}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await supabase.auth.signOut();
+                      toast.success("Signed out successfully!");
+                      setShowSettings(false);
+                    }}
+                    className="shrink-0 rounded-lg border border-red-500/20 hover:border-red-500/40 bg-red-500/10 hover:bg-red-500/15 text-red-500 px-3 py-1.5 text-xs font-semibold transition active:scale-95 cursor-pointer"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              ) : (
+                <div className="mb-6 p-4 bg-muted/30 border border-border rounded-xl text-center space-y-2.5">
+                  <p className="text-xs text-muted-foreground">You are browsing as a guest.</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigate({ to: "/auth" });
+                      setShowSettings(false);
+                    }}
+                    className="w-full rounded-lg bg-primary py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 active:scale-95 transition cursor-pointer"
+                    style={{ background: "var(--gradient-primary)" }}
+                  >
+                    Sign In to SocialOS
+                  </button>
+                </div>
+              )}
+
               <div className="flex items-center gap-2 mb-4 border-b border-border pb-3">
                 <Key className="h-4.5 w-4.5 text-primary" />
                 <h3 className="font-semibold text-sm text-foreground">API Settings</h3>
