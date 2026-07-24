@@ -24,21 +24,27 @@ export function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
   const [isMaximized, setIsMaximized] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [isCollectingEmail, setIsCollectingEmail] = useState(false);
+  const [leadId, setLeadId] = useState<string | null>(null);
+  const [leadEmail, setLeadEmail] = useState<string | null>(null);
 
-  const getGreeting = (currentUser: any) => {
+  const getGreeting = (currentUser: any, collecting: boolean) => {
     if (currentUser) {
       const email = currentUser.email || "";
       const name = email.split("@")[0];
       const nameCap = name.charAt(0).toUpperCase() + name.slice(1);
       return `Hi, ${nameCap}! I'm your SocialOS AI Assistant. ☕⚡ How can I help you manage your social platforms, write captions, or schedule posts today?`;
     }
-    return "Hi! I'm your SocialOS AI Assistant. ☕⚡ Please sign in to unlock scheduling, AI Caption Studio, and dashboard analytics. How can I help you today?";
+    if (collecting) {
+      return "Hi! I'm your SocialOS AI Assistant. ☕⚡ To get started, please enter your email address so we can keep you updated and save your session.";
+    }
+    return "Hi! I'm your SocialOS AI Assistant. ☕⚡ How can I help you manage your social platforms, write captions, or schedule posts today?";
   };
 
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: getGreeting(null),
+      content: getGreeting(null, true),
     },
   ]);
 
@@ -58,20 +64,111 @@ export function Chatbot() {
     };
   }, []);
 
-  // Update initial greeting when user session changes
+  // Initialize or Load guest lead session / authenticated user
   useEffect(() => {
-    setMessages((prev) => {
-      if (prev.length === 1 && prev[0].role === "assistant") {
-        return [
-          {
-            role: "assistant",
-            content: getGreeting(user),
-          },
-        ];
+    const initSession = async () => {
+      if (user) {
+        try {
+          const email = user.email;
+          if (!email) return;
+
+          // Check if lead exists
+          const { data: existingLead } = await supabase
+            .from("chatbot_leads")
+            .select("id")
+            .eq("email", email)
+            .maybeSingle();
+
+          if (existingLead) {
+            setLeadId(existingLead.id);
+            setLeadEmail(email);
+            setIsCollectingEmail(false);
+          } else {
+            // Create lead
+            const { data: newLead } = await supabase
+              .from("chatbot_leads")
+              .insert({ email })
+              .select("id")
+              .maybeSingle();
+
+            if (newLead) {
+              setLeadId(newLead.id);
+              setLeadEmail(email);
+              setIsCollectingEmail(false);
+            }
+          }
+        } catch (e) {
+          console.error("Auth lead init failed:", e);
+        }
+      } else {
+        const cachedId = localStorage.getItem("chatbot_lead_id");
+        const cachedEmail = localStorage.getItem("chatbot_lead_email");
+
+        if (cachedId && cachedEmail) {
+          setLeadId(cachedId);
+          setLeadEmail(cachedEmail);
+          setIsCollectingEmail(false);
+        } else {
+          setLeadId(null);
+          setLeadEmail(null);
+          setIsCollectingEmail(true);
+        }
       }
-      return prev;
-    });
+    };
+
+    initSession();
   }, [user]);
+
+  // Load chat history (last 7 days) from Supabase
+  useEffect(() => {
+    if (!leadId) {
+      setMessages([
+        {
+          role: "assistant",
+          content: getGreeting(user, isCollectingEmail),
+        },
+      ]);
+      return;
+    }
+
+    const fetchChatHistory = async () => {
+      try {
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+        const { data: dbMessages, error } = await supabase
+          .from("chatbot_messages")
+          .select("role, content, created_at")
+          .eq("lead_id", leadId)
+          .gte("created_at", sevenDaysAgo.toISOString())
+          .order("created_at", { ascending: true });
+
+        if (error) {
+          console.error("Error fetching message history:", error);
+          return;
+        }
+
+        if (dbMessages && dbMessages.length > 0) {
+          const formattedMessages: Message[] = dbMessages.map((msg) => ({
+            role: msg.role as "user" | "assistant",
+            content: msg.content,
+          }));
+          setMessages(formattedMessages);
+        } else {
+          setMessages([
+            {
+              role: "assistant",
+              content: getGreeting(user, false),
+            },
+          ]);
+        }
+      } catch (e) {
+        console.error("Failed to load chat history:", e);
+      }
+    };
+
+    fetchChatHistory();
+  }, [leadId, isCollectingEmail]);
 
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -345,6 +442,20 @@ export function Chatbot() {
     setVoiceStatus("thinking");
     setVoiceText("Thinking...");
 
+    // Asynchronously save user voice message to history table
+    if (leadId) {
+      supabase
+        .from("chatbot_messages")
+        .insert({
+          lead_id: leadId,
+          role: "user",
+          content: text,
+        })
+        .then(({ error }) => {
+          if (error) console.error("Error saving voice user message to history:", error);
+        });
+    }
+
     try {
       const chatHistory = updatedMessages.map((m) => ({
         role: m.role,
@@ -363,6 +474,20 @@ export function Chatbot() {
 
       setMessages((prev) => [...prev, { role: "assistant", content: res.reply }]);
       speakVoiceResponse(res.reply);
+
+      // Asynchronously save assistant response to history table
+      if (leadId) {
+        supabase
+          .from("chatbot_messages")
+          .insert({
+            lead_id: leadId,
+            role: "assistant",
+            content: res.reply,
+          })
+          .then(({ error }) => {
+            if (error) console.error("Error saving voice response to history:", error);
+          });
+      }
     } catch (e) {
       console.error("Voice response error:", e);
       setVoiceStatus("error");
@@ -376,6 +501,11 @@ export function Chatbot() {
   };
 
   const startVoiceCall = () => {
+    if (isCollectingEmail) {
+      toast.warning("Please type and save your email address before initiating a voice call.");
+      return;
+    }
+
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       toast.error("Speech recognition is not supported in this browser. Please try Chrome, Edge, or Safari.");
@@ -456,6 +586,111 @@ export function Chatbot() {
   const handleSend = async (text: string) => {
     if (!text.trim() && attachedFiles.length === 0) return;
 
+    // 1. Email Collection Phase
+    if (isCollectingEmail) {
+      const email = text.trim();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+      setMessages((prev) => [...prev, { role: "user", content: email }]);
+      setInputValue("");
+      setIsLoading(true);
+
+      if (!emailRegex.test(email)) {
+        setTimeout(() => {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: "That email address doesn't look quite right. Please enter a valid email address (e.g. you@company.com) so we can initialize your session.",
+            },
+          ]);
+          setIsLoading(false);
+        }, 600);
+        return;
+      }
+
+      try {
+        let existingId: string | null = null;
+
+        // Check if lead already exists
+        const { data: existingLead } = await supabase
+          .from("chatbot_leads")
+          .select("id")
+          .eq("email", email)
+          .maybeSingle();
+
+        if (existingLead) {
+          existingId = existingLead.id;
+        } else {
+          // Create new lead
+          const { data: newLead } = await supabase
+            .from("chatbot_leads")
+            .insert({ email })
+            .select("id")
+            .maybeSingle();
+
+          if (newLead) {
+            existingId = newLead.id;
+          }
+        }
+
+        if (existingId) {
+          localStorage.setItem("chatbot_lead_id", existingId);
+          localStorage.setItem("chatbot_lead_email", email);
+          setLeadEmail(email);
+          setLeadId(existingId);
+          setIsCollectingEmail(false);
+
+          // Retrieve last 7 days of history if returning user
+          const sevenDaysAgo = new Date();
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+          const { data: dbMessages } = await supabase
+            .from("chatbot_messages")
+            .select("role, content")
+            .eq("lead_id", existingId)
+            .gte("created_at", sevenDaysAgo.toISOString())
+            .order("created_at", { ascending: true });
+
+          setTimeout(() => {
+            if (dbMessages && dbMessages.length > 0) {
+              const formattedMessages: Message[] = dbMessages.map((msg) => ({
+                role: msg.role as "user" | "assistant",
+                content: msg.content,
+              }));
+              setMessages(formattedMessages);
+              toast.success("Welcome back! Loaded your recent chat history.");
+            } else {
+              setMessages((prev) => [
+                ...prev,
+                {
+                  role: "assistant",
+                  content: "Thanks! Your session is initialized. How can I help you manage your social media platforms today?",
+                },
+              ]);
+            }
+            setIsLoading(false);
+          }, 800);
+        } else {
+          throw new Error("Could not store email.");
+        }
+      } catch (e) {
+        console.error("Error creating guest lead:", e);
+        setTimeout(() => {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: "I ran into a problem saving your email. Please try entering it again.",
+            },
+          ]);
+          setIsLoading(false);
+        }, 600);
+      }
+      return;
+    }
+
+    // 2. Normal Chat Conversation Phase
     const userMessage: Message = { 
       role: "user", 
       content: text,
@@ -466,6 +701,20 @@ export function Chatbot() {
     setInputValue("");
     setAttachedFiles([]);
     setIsLoading(true);
+
+    // Save user message to DB in history table
+    if (leadId) {
+      supabase
+        .from("chatbot_messages")
+        .insert({
+          lead_id: leadId,
+          role: "user",
+          content: text,
+        })
+        .then(({ error }) => {
+          if (error) console.error("Error saving user message to history:", error);
+        });
+    }
 
     try {
       const chatHistory = updatedMessages.map((m) => {
@@ -510,6 +759,20 @@ export function Chatbot() {
         }
         return nextMessages;
       });
+
+      // Save assistant message to DB in history table
+      if (leadId) {
+        supabase
+          .from("chatbot_messages")
+          .insert({
+            lead_id: leadId,
+            role: "assistant",
+            content: res.reply,
+          })
+          .then(({ error }) => {
+            if (error) console.error("Error saving assistant message to history:", error);
+          });
+      }
     } catch (e: any) {
       console.error(e);
       toast.error("Failed to connect to assistant.");
@@ -537,7 +800,7 @@ export function Chatbot() {
     setMessages([
       {
         role: "assistant",
-        content: getGreeting(user),
+        content: getGreeting(user, isCollectingEmail),
       },
     ]);
     stopSpeech();
@@ -695,6 +958,8 @@ export function Chatbot() {
                   <button
                     type="button"
                     onClick={async () => {
+                      localStorage.removeItem("chatbot_lead_id");
+                      localStorage.removeItem("chatbot_lead_email");
                       await supabase.auth.signOut();
                       toast.success("Signed out successfully!");
                       setShowSettings(false);
@@ -1125,7 +1390,7 @@ export function Chatbot() {
                   onClick={() => fileInputRef.current?.click()}
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground hover:bg-secondary hover:text-foreground transition active:scale-95 cursor-pointer"
                   title="Attach files, photos, or videos"
-                  disabled={isLoading}
+                  disabled={isLoading || isCollectingEmail}
                 >
                   <Plus className="h-4.5 w-4.5" />
                 </button>
@@ -1133,7 +1398,7 @@ export function Chatbot() {
                   type="text"
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
-                  placeholder={isListening ? "Listening..." : "Ask anything about SocialOS..."}
+                  placeholder={isListening ? "Listening..." : isCollectingEmail ? "Enter your email address..." : "Ask anything about SocialOS..."}
                   className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground"
                   disabled={isLoading}
                 />
@@ -1146,7 +1411,7 @@ export function Chatbot() {
                       : "bg-background text-muted-foreground border-border hover:bg-secondary hover:text-foreground"
                   }`}
                   title={isListening ? "Stop listening" : "Speak to assistant"}
-                  disabled={isLoading}
+                  disabled={isLoading || isCollectingEmail}
                 >
                   <Mic className="h-4 w-4" />
                 </button>

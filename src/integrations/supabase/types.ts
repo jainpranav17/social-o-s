@@ -95,6 +95,55 @@ export type Database = {
         };
         Relationships: [];
       };
+      chatbot_leads: {
+        Row: {
+          created_at: string;
+          email: string;
+          id: string;
+        };
+        Insert: {
+          created_at?: string;
+          email: string;
+          id?: string;
+        };
+        Update: {
+          created_at?: string;
+          email?: string;
+          id?: string;
+        };
+        Relationships: [];
+      };
+      chatbot_messages: {
+        Row: {
+          content: string;
+          created_at: string;
+          id: string;
+          lead_id: string;
+          role: "user" | "assistant";
+        };
+        Insert: {
+          content: string;
+          created_at?: string;
+          id?: string;
+          lead_id: string;
+          role: "user" | "assistant";
+        };
+        Update: {
+          content?: string;
+          created_at?: string;
+          id?: string;
+          lead_id?: string;
+          role?: "user" | "assistant";
+        };
+        Relationships: [
+          {
+            foreignKeyName: "chatbot_messages_lead_id_fkey";
+            columns: ["lead_id"];
+            referencedRelation: "chatbot_leads";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
