@@ -4,6 +4,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { Sparkles, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const searchSchema = z.object({
   mode: z.enum(["signin", "signup"]).optional().default("signin"),
@@ -105,6 +106,9 @@ function AuthPage() {
       className="relative min-h-screen bg-background"
       style={{ background: "var(--gradient-hero)" }}
     >
+      <div className="absolute top-4 right-4 z-50">
+        <ThemeToggle />
+      </div>
       <div className="flex min-h-screen items-center justify-center px-4 py-16">
         <div className="w-full max-w-md">
           <Link to="/" className="mb-8 flex items-center justify-center gap-2">
