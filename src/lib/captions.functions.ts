@@ -82,8 +82,7 @@ export const listCaptions = createServerFn({ method: "GET" })
     const { data, error } = await context.supabase
       .from("captions")
       .select("id, topic, tone, platform, caption, hashtags, cta, score, created_at")
-      .order("created_at", { ascending: false })
-      .limit(20);
+      .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return data ?? [];
   });
