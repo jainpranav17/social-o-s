@@ -176,19 +176,35 @@ const testimonials = [
 const faqs = [
   {
     q: "Is SocialOS free during the beta?",
-    a: "Yes. All core features are free while we're in beta. Paid plans launch soon.",
+    a: "Yes! All core features are completely free to use while we are in active beta. Paid tier features and plans will launch in the future.",
   },
   {
     q: "Which platforms do you support?",
-    a: "Instagram, Facebook, LinkedIn, and X today. YouTube and Threads are next.",
+    a: "We support direct OAuth2 connections and automated publishing for Instagram, YouTube, Facebook, LinkedIn, and X (Twitter). Threads support is also available.",
+  },
+  {
+    q: "How do I log in without a password?",
+    a: "SocialOS uses secure, passwordless authentication. Simply enter your email address on the sign-in screen, click 'Send Magic Link', and click the confirmation link sent directly to your inbox to instantly gain access. No passwords to remember or manage!",
   },
   {
     q: "Do you use my content to train AI?",
-    a: "Never. Your data stays yours — we only use it to power your own workspace.",
+    a: "Never. We value your privacy. Your copy, captions, and media stay strictly yours and are never used to train or refine external AI models.",
+  },
+  {
+    q: "Is my API Key stored securely?",
+    a: "Yes. Any API Keys you enter in settings (such as your personal Lovable or OpenAI API keys) are stored locally in your browser's LocalStorage. They are never sent to or saved on our servers.",
+  },
+  {
+    q: "How does the AI Caption Studio work?",
+    a: "AI Caption Studio leverages powerful language models (like Gemini) to analyze your topic, tone, audience, and platform. It instantly outputs highly engaging, customized captions, optimized hashtags, and call-to-actions, along with a virality score prediction.",
+  },
+  {
+    q: "Are there any content creation limits?",
+    a: "No! We have removed content limits from the platform, allowing you to generate AI captions and retrieve your generation history without limits.",
   },
   {
     q: "Can teams collaborate?",
-    a: "Team workspaces with role-based access are on the roadmap for Q2.",
+    a: "Team workspaces, shared calendar queues, and role-based permissions are currently on our roadmap for Q2.",
   },
 ];
 
