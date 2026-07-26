@@ -30,7 +30,6 @@ export function Chatbot() {
   // Embedded Authentication states
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
   const [authEmail, setAuthEmail] = useState("");
-  const [authPassword, setAuthPassword] = useState("");
   const [authName, setAuthName] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
@@ -168,49 +167,29 @@ export function Chatbot() {
     setAuthLoading(true);
 
     const email = authEmail.trim();
-    const password = authPassword;
 
-    if (!email || !password) {
-      setAuthError("Please fill in all fields.");
+    if (!email) {
+      setAuthError("Please enter your email address.");
       setAuthLoading(false);
       return;
     }
 
     try {
-      if (authMode === "login") {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) {
-          setAuthError(error.message);
-        } else {
-          toast.success("Successfully signed in!");
-          setAuthEmail("");
-          setAuthPassword("");
-        }
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: window.location.origin + "/dashboard",
+          data: authMode === "signup" ? {
+            full_name: authName.trim() || undefined,
+          } : undefined,
+        },
+      });
+      if (error) {
+        setAuthError(error.message);
       } else {
-        const { error, data } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: authName.trim() || undefined,
-            },
-          },
-        });
-        if (error) {
-          setAuthError(error.message);
-        } else {
-          if (data.session) {
-            toast.success("Account created and signed in!");
-          } else {
-            toast.success("Please check your email to confirm registration.");
-          }
-          setAuthEmail("");
-          setAuthPassword("");
-          setAuthName("");
-        }
+        toast.success("Magic link sent! Check your email to sign in.");
+        setAuthEmail("");
+        setAuthName("");
       }
     } catch (e: any) {
       console.error("Auth execution error:", e);
@@ -938,19 +917,6 @@ export function Chatbot() {
                     />
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Password</label>
-                    <input
-                      type="password"
-                      value={authPassword}
-                      onChange={(e) => setAuthPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground"
-                      disabled={authLoading}
-                      required
-                    />
-                  </div>
-
                   <button
                     type="submit"
                     disabled={authLoading}
@@ -959,10 +925,8 @@ export function Chatbot() {
                   >
                     {authLoading ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : authMode === "login" ? (
-                      "Sign In"
                     ) : (
-                      "Register"
+                      "Send Magic Link"
                     )}
                   </button>
                 </form>

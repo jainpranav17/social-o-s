@@ -29,7 +29,6 @@ export const Route = createFileRoute("/auth")({
 
 const credSchema = z.object({
   email: z.string().trim().email("Enter a valid email").max(255),
-  password: z.string().min(8, "Password must be at least 8 characters").max(128),
 });
 
 function AuthPage() {
@@ -37,7 +36,7 @@ function AuthPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<"signin" | "signup">(search.mode);
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [userEmail, setUserEmail] = useState("");
@@ -62,34 +61,25 @@ function AuthPage() {
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    const parsed = credSchema.safeParse({ email, password });
+    const parsed = credSchema.safeParse({ email });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0].message);
       return;
     }
     setLoading(true);
     try {
-      if (mode === "signup") {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: window.location.origin + "/dashboard" },
-        });
-        if (error) throw error;
-        
-        if (data.session) {
-          toast.success("Account created and signed in!");
-          navigate({ to: "/dashboard" });
-        } else {
-          toast.success("Account created! Please check your email to confirm registration.");
-          navigate({ to: "/auth", search: { mode: "signin", verify: "true" } });
-        }
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        toast.success("Welcome back");
-        navigate({ to: "/dashboard" });
-      }
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: window.location.origin + "/dashboard",
+          data: mode === "signup" ? {
+            full_name: fullName.trim() || undefined,
+          } : undefined,
+        },
+      });
+      if (error) throw error;
+      toast.success("Magic link sent! Check your email to sign in.");
+      navigate({ to: "/auth", search: { mode: "signin", verify: "true" } });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Authentication failed");
     } finally {
@@ -249,8 +239,20 @@ function AuthPage() {
                 </div>
 
                 <form onSubmit={handleEmailAuth} className="space-y-4">
+                  {mode === "signup" && (
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">Full Name</label>
+                      <input
+                        type="text"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
+                        placeholder="Pranav Jain"
+                      />
+                    </div>
+                  )}
                   <div>
-                    <label className="text-xs font-medium text-muted-foreground">Email</label>
+                    <label className="text-xs font-medium text-muted-foreground">Email Address</label>
                     <input
                       type="email"
                       value={email}
@@ -261,18 +263,6 @@ function AuthPage() {
                       placeholder="you@company.com"
                     />
                   </div>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Password</label>
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      autoComplete={mode === "signup" ? "new-password" : "current-password"}
-                      className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
-                      placeholder="At least 8 characters"
-                    />
-                  </div>
                   <button
                     type="submit"
                     disabled={loading}
@@ -280,7 +270,7 @@ function AuthPage() {
                     style={{ background: "var(--gradient-primary)" }}
                   >
                     {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-                    {mode === "signup" ? "Create account" : "Sign in"}
+                    Send Magic Link
                   </button>
                 </form>
 
