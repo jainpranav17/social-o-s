@@ -710,6 +710,7 @@ function Landing() {
             <ThemeToggle />
             <Link
               to="/auth"
+              search={{ mode: "signin" }}
               className="hidden rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition hover:text-foreground sm:inline-flex"
             >
               Sign in

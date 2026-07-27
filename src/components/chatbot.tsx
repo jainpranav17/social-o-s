@@ -23,20 +23,16 @@ export function Chatbot() {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [isMaximized, setIsMaximized] = useState(true);
-  const [user, setUser] = useState<any>(null);
   const [leadId, setLeadId] = useState<string | null>(null);
   const [leadEmail, setLeadEmail] = useState<string | null>(null);
 
   // Embedded Authentication states
-  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
   const [authEmail, setAuthEmail] = useState("");
-  const [authName, setAuthName] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
 
-  const getGreeting = (currentUser: any) => {
-    if (currentUser) {
-      const email = currentUser.email || "";
+  const getGreeting = (email: string | null) => {
+    if (email) {
       const name = email.split("@")[0];
       const nameCap = name.charAt(0).toUpperCase() + name.slice(1);
       return `Hi, ${nameCap}! I'm your SocialOS AI Assistant. ☕⚡ How can I help you manage your social platforms, write captions, or schedule posts today?`;
@@ -44,71 +40,24 @@ export function Chatbot() {
     return "Hi! I'm your SocialOS AI Assistant. ☕⚡ How can I help you manage your social platforms, write captions, or schedule posts today?";
   };
 
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      content: getGreeting(null),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
 
+  // Load guest session from localStorage on mount
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    const savedEmail = localStorage.getItem("chatbot_lead_email");
+    const savedId = localStorage.getItem("chatbot_lead_id");
+    if (savedEmail && savedId) {
+      setLeadEmail(savedEmail);
+      setLeadId(savedId);
+    } else {
+      setMessages([
+        {
+          role: "assistant",
+          content: getGreeting(null),
+        },
+      ]);
+    }
   }, []);
-
-  // Initialize or Load guest lead session / authenticated user
-  useEffect(() => {
-    const initSession = async () => {
-      if (user) {
-        try {
-          const email = user.email;
-          if (!email) return;
-
-          // Check if lead exists
-          const { data: existingLead } = await supabase
-            .from("chatbot_leads")
-            .select("id")
-            .eq("email", email)
-            .maybeSingle();
-
-          if (existingLead) {
-            setLeadId(existingLead.id);
-            setLeadEmail(email);
-          } else {
-            // Create lead
-            const { data: newLead } = await supabase
-              .from("chatbot_leads")
-              .insert({ email })
-              .select("id")
-              .maybeSingle();
-
-            if (newLead) {
-              setLeadId(newLead.id);
-              setLeadEmail(email);
-            }
-          }
-        } catch (e) {
-          console.error("Auth lead init failed:", e);
-        }
-      } else {
-        setLeadId(null);
-        setLeadEmail(null);
-      }
-    };
-
-    initSession();
-  }, [user]);
 
   // Load chat history (last 7 days) from Supabase
   useEffect(() => {
@@ -116,7 +65,7 @@ export function Chatbot() {
       setMessages([
         {
           role: "assistant",
-          content: getGreeting(user),
+          content: getGreeting(leadEmail),
         },
       ]);
       return;
@@ -149,7 +98,7 @@ export function Chatbot() {
           setMessages([
             {
               role: "assistant",
-              content: getGreeting(user),
+              content: getGreeting(leadEmail),
             },
           ]);
         }
@@ -159,14 +108,14 @@ export function Chatbot() {
     };
 
     fetchChatHistory();
-  }, [leadId]);
+  }, [leadId, leadEmail]);
 
-  const handleAuthSubmit = async (e: React.FormEvent) => {
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
     setAuthLoading(true);
 
-    const email = authEmail.trim();
+    const email = authEmail.trim().toLowerCase();
 
     if (!email) {
       setAuthError("Please enter your email address.");
@@ -175,24 +124,51 @@ export function Chatbot() {
     }
 
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: window.location.origin + "/dashboard",
-          data: authMode === "signup" ? {
-            full_name: authName.trim() || undefined,
-          } : undefined,
-        },
-      });
-      if (error) {
-        setAuthError(error.message);
+      // Check if lead exists in supabase
+      const { data: existingLead, error: fetchError } = await supabase
+        .from("chatbot_leads")
+        .select("id")
+        .eq("email", email)
+        .maybeSingle();
+
+      if (fetchError) {
+        setAuthError(fetchError.message);
+        setAuthLoading(false);
+        return;
+      }
+
+      let finalLeadId = "";
+
+      if (existingLead) {
+        finalLeadId = existingLead.id;
       } else {
-        toast.success("Magic link sent! Check your email to sign in.");
-        setAuthEmail("");
-        setAuthName("");
+        // Create lead in supabase
+        const { data: newLead, error: insertError } = await supabase
+          .from("chatbot_leads")
+          .insert({ email })
+          .select("id")
+          .maybeSingle();
+
+        if (insertError) {
+          setAuthError(insertError.message);
+          setAuthLoading(false);
+          return;
+        }
+
+        if (newLead) {
+          finalLeadId = newLead.id;
+        }
+      }
+
+      if (finalLeadId) {
+        localStorage.setItem("chatbot_lead_email", email);
+        localStorage.setItem("chatbot_lead_id", finalLeadId);
+        setLeadEmail(email);
+        setLeadId(finalLeadId);
+        toast.success("Welcome! Chatbot unlocked.");
       }
     } catch (e: any) {
-      console.error("Auth execution error:", e);
+      console.error("Unlock execution error:", e);
       setAuthError("Connection failed. Please try again.");
     } finally {
       setAuthLoading(false);
@@ -210,8 +186,11 @@ export function Chatbot() {
   const [showSettings, setShowSettings] = useState(false);
   const [lovableKey, setLovableKey] = useState("");
   const [openaiKey, setOpenaiKey] = useState("");
+  const [geminiKey, setGeminiKey] = useState("");
   const [showLovableKey, setShowLovableKey] = useState(false);
   const [showOpenaiKey, setShowOpenaiKey] = useState(false);
+  const [showGeminiKey, setShowGeminiKey] = useState(false);
+  const [chatLanguage, setChatLanguage] = useState<"en" | "hi">("en");
   const [isMuted, setIsMuted] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("chatbot_muted") === "true";
@@ -219,6 +198,29 @@ export function Chatbot() {
     return false;
   });
   const [activeSpeechIndex, setActiveSpeechIndex] = useState<number | null>(null);
+
+  const getMelodyVoice = (lang: string) => {
+    if (typeof window === "undefined" || !('speechSynthesis' in window)) return null;
+    const voices = window.speechSynthesis.getVoices();
+    
+    if (lang === "hi") {
+      const hiVoice = voices.find(v => v.lang.startsWith("hi") || v.name.toLowerCase().includes("hindi") || v.name.toLowerCase().includes("india"));
+      if (hiVoice) return hiVoice;
+    } else {
+      const melody = voices.find(v => v.name.toLowerCase().includes("melody"));
+      if (melody) return melody;
+      
+      const googleUS = voices.find(v => v.name.toLowerCase().includes("google us english") || v.name.toLowerCase().includes("google uk english female"));
+      if (googleUS) return googleUS;
+      
+      const natural = voices.find(v => v.name.toLowerCase().includes("natural") && (v.lang.startsWith("en-US") || v.lang.startsWith("en-GB")));
+      if (natural) return natural;
+      
+      const standardFemale = voices.find(v => v.name.toLowerCase().includes("zira") || v.name.toLowerCase().includes("aria") || v.name.toLowerCase().includes("jenny"));
+      if (standardFemale) return standardFemale;
+    }
+    return null;
+  };
 
   // AI Voice Agent State Variables
   const [isVoiceMode, setIsVoiceMode] = useState(false);
@@ -259,8 +261,10 @@ export function Chatbot() {
   useEffect(() => {
     const savedLovableKey = localStorage.getItem("lovable_api_key") || "";
     const savedOpenaiKey = localStorage.getItem("openai_api_key") || "";
+    const savedGeminiKey = localStorage.getItem("gemini_api_key") || "";
     setLovableKey(savedLovableKey);
     setOpenaiKey(savedOpenaiKey);
+    setGeminiKey(savedGeminiKey);
 
     return () => {
       // Global cleanup
@@ -371,7 +375,7 @@ export function Chatbot() {
       const rec = new SpeechRecognition();
       rec.continuous = false;
       rec.interimResults = true;
-      rec.lang = "en-US";
+      rec.lang = chatLanguage === "hi" ? "hi-IN" : "en-US";
 
       rec.onstart = () => {
         setVoiceStatus("listening");
@@ -440,6 +444,11 @@ export function Chatbot() {
 
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = chatLanguage === "hi" ? "hi-IN" : "en-US";
+    const selectedVoice = getMelodyVoice(chatLanguage);
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+    }
     currentUtteranceRef.current = utterance;
 
     utterance.onend = () => {
@@ -490,14 +499,10 @@ export function Chatbot() {
         role: m.role,
         content: m.content,
       }));
-      const userApiKey = localStorage.getItem("lovable_api_key") || undefined;
-      const userOpenaiKey = localStorage.getItem("openai_api_key") || undefined;
-
       const res = await ask({
         data: {
           messages: chatHistory,
-          apiKey: userApiKey,
-          openaiApiKey: userOpenaiKey,
+          language: chatLanguage,
         },
       });
 
@@ -647,13 +652,10 @@ export function Chatbot() {
           content: content,
         };
       });
-      const userApiKey = localStorage.getItem("lovable_api_key") || undefined;
-      const userOpenaiKey = localStorage.getItem("openai_api_key") || undefined;
       const res = await ask({
         data: {
           messages: chatHistory,
-          apiKey: userApiKey,
-          openaiApiKey: userOpenaiKey
+          language: chatLanguage,
         }
       });
       
@@ -667,6 +669,11 @@ export function Chatbot() {
         if (!isMuted && 'speechSynthesis' in window) {
           window.speechSynthesis.cancel();
           const utterance = new SpeechSynthesisUtterance(res.reply);
+          utterance.lang = chatLanguage === "hi" ? "hi-IN" : "en-US";
+          const selectedVoice = getMelodyVoice(chatLanguage);
+          if (selectedVoice) {
+            utterance.voice = selectedVoice;
+          }
           utterance.onend = () => {
             setActiveSpeechIndex((current) => current === newMsgIdx ? null : current);
           };
@@ -715,7 +722,7 @@ export function Chatbot() {
     setMessages([
       {
         role: "assistant",
-        content: getGreeting(user),
+        content: getGreeting(leadEmail),
       },
     ]);
     stopSpeech();
@@ -784,8 +791,19 @@ export function Chatbot() {
               </div>
             </div>
              <div className="flex items-center gap-1.5">
-              {user && !isVoiceMode && (
+              {leadEmail && !isVoiceMode && (
                 <>
+                  <button
+                    onClick={() => {
+                      const nextLang = chatLanguage === "en" ? "hi" : "en";
+                      setChatLanguage(nextLang);
+                      toast.success(nextLang === "hi" ? "भाषा बदलकर हिंदी कर दी गई है" : "Language switched to English");
+                    }}
+                    className="rounded-lg px-2 py-1 bg-white/15 hover:bg-white/25 text-white text-[10px] font-bold transition cursor-pointer flex items-center justify-center min-w-8 mr-0.5"
+                    title={chatLanguage === "en" ? "Switch to Hindi" : "अंग्रेजी में बदलें"}
+                  >
+                    {chatLanguage === "en" ? "EN" : "हिं"}
+                  </button>
                   <button
                     onClick={startVoiceCall}
                     className="rounded-lg p-1.5 hover:bg-white/10 text-white/90 hover:text-white transition cursor-pointer"
@@ -827,7 +845,7 @@ export function Chatbot() {
                   )}
                 </>
               )}
-              {user && isVoiceMode && (
+              {leadEmail && isVoiceMode && (
                 <button
                   onClick={() => {
                     const newVal = !voiceSpeakerMuted;
@@ -866,7 +884,7 @@ export function Chatbot() {
           </div>
 
           {/* Settings, Voice Call, or Chat View */}
-          {!user ? (
+          {!leadEmail ? (
             <div className="flex-1 flex flex-col justify-center p-6 bg-card overflow-y-auto font-sans animate-fade-in">
               <div className="max-w-md w-full mx-auto space-y-5">
                 <div className="text-center space-y-2">
@@ -874,12 +892,10 @@ export function Chatbot() {
                     <Sparkles className="h-6 w-6" />
                   </div>
                   <h3 className="text-lg font-bold text-foreground">
-                    {authMode === "login" ? "Welcome to SocialOS" : "Create your Account"}
+                    Welcome to SocialOS
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    {authMode === "login" 
-                      ? "Sign in with your email to unlock your AI Assistant." 
-                      : "Register to save your chat logs and schedule posts."}
+                    Enter your email to unlock your AI Assistant.
                   </p>
                 </div>
 
@@ -889,21 +905,7 @@ export function Chatbot() {
                   </div>
                 )}
 
-                <form onSubmit={handleAuthSubmit} className="space-y-4">
-                  {authMode === "signup" && (
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Full Name</label>
-                      <input
-                        type="text"
-                        value={authName}
-                        onChange={(e) => setAuthName(e.target.value)}
-                        placeholder="Pranav Jain"
-                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground"
-                        disabled={authLoading}
-                      />
-                    </div>
-                  )}
-
+                <form onSubmit={handleEmailSubmit} className="space-y-4">
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Email Address</label>
                     <input
@@ -926,25 +928,10 @@ export function Chatbot() {
                     {authLoading ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      "Send Magic Link"
+                      "Start Chatting"
                     )}
                   </button>
                 </form>
-
-                <div className="text-center">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAuthMode(authMode === "login" ? "signup" : "login");
-                      setAuthError("");
-                    }}
-                    className="text-xs text-primary hover:underline font-semibold cursor-pointer"
-                  >
-                    {authMode === "login"
-                      ? "Don't have an account? Sign Up"
-                      : "Already have an account? Sign In"}
-                  </button>
-                </div>
               </div>
             </div>
           ) : showSettings ? (
@@ -955,18 +942,25 @@ export function Chatbot() {
                 <h3 className="font-semibold text-sm text-foreground">Account Profile</h3>
               </div>
 
-              {user ? (
+              {leadEmail ? (
                 <div className="mb-6 p-3 bg-muted/40 border border-border rounded-xl flex items-center justify-between gap-3">
                   <div className="truncate">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Signed In As</p>
-                    <p className="text-xs font-semibold text-foreground truncate" title={user.email}>{user.email}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Guest Email</p>
+                    <p className="text-xs font-semibold text-foreground truncate" title={leadEmail}>{leadEmail}</p>
                   </div>
                   <button
                     type="button"
-                    onClick={async () => {
+                    onClick={() => {
                       localStorage.removeItem("chatbot_lead_id");
                       localStorage.removeItem("chatbot_lead_email");
-                      await supabase.auth.signOut();
+                      setLeadId(null);
+                      setLeadEmail(null);
+                      setMessages([
+                        {
+                          role: "assistant",
+                          content: getGreeting(null),
+                        },
+                      ]);
                       toast.success("Signed out successfully!");
                       setShowSettings(false);
                     }}
@@ -978,110 +972,17 @@ export function Chatbot() {
               ) : (
                 <div className="mb-6 p-4 bg-muted/30 border border-border rounded-xl text-center space-y-2.5">
                   <p className="text-xs text-muted-foreground">You are browsing as a guest.</p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigate({ to: "/auth" });
-                      setShowSettings(false);
-                    }}
-                    className="w-full rounded-lg bg-primary py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 active:scale-95 transition cursor-pointer"
-                    style={{ background: "var(--gradient-primary)" }}
-                  >
-                    Sign In to SocialOS
-                  </button>
                 </div>
               )}
 
-              <div className="flex items-center gap-2 mb-4 border-b border-border pb-3">
-                <Key className="h-4.5 w-4.5 text-primary" />
-                <h3 className="font-semibold text-sm text-foreground">API Settings</h3>
-              </div>
-
-              <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
-                Configure your API keys below to activate premium AI capabilities. Keys are stored locally in your browser.
-              </p>
-
-              <div className="space-y-4 flex-1">
-                {/* Lovable API Key */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Lovable API Key
-                  </label>
-                  <div className="relative flex items-center">
-                    <input
-                      type={showLovableKey ? "text" : "password"}
-                      value={lovableKey}
-                      onChange={(e) => setLovableKey(e.target.value)}
-                      placeholder="lovable_..."
-                      className="w-full rounded-lg border border-border bg-background pl-3 pr-10 py-2 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowLovableKey(!showLovableKey)}
-                      className="absolute right-3 text-muted-foreground hover:text-foreground transition cursor-pointer"
-                    >
-                      {showLovableKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground/80 leading-normal">
-                    Powers the Web Assistant and AI Caption Studio. Get your key from the Lovable console.
-                  </p>
-                </div>
-
-                {/* OpenAI API Key */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    OpenAI API Key
-                  </label>
-                  <div className="relative flex items-center">
-                    <input
-                      type={showOpenaiKey ? "text" : "password"}
-                      value={openaiKey}
-                      onChange={(e) => setOpenaiKey(e.target.value)}
-                      placeholder="sk-proj-..."
-                      className="w-full rounded-lg border border-border bg-background pl-3 pr-10 py-2 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 text-foreground"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowOpenaiKey(!showOpenaiKey)}
-                      className="absolute right-3 text-muted-foreground hover:text-foreground transition cursor-pointer"
-                    >
-                      {showOpenaiKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground/80 leading-normal">
-                    Used by the Python RAG chatbot backend CLI. Save here or add to your local `.env` file.
-                  </p>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="mt-5 pt-3 border-t border-border flex items-center gap-2.5">
+              {/* Back to Chat button */}
+              <div className="mt-auto pt-3 border-t border-border flex items-center justify-end">
                 <button
                   type="button"
-                  onClick={() => {
-                    localStorage.setItem("lovable_api_key", lovableKey.trim());
-                    localStorage.setItem("openai_api_key", openaiKey.trim());
-                    toast.success("API keys updated successfully!");
-                    setShowSettings(false);
-                  }}
-                  className="flex-1 rounded-lg py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 active:scale-[0.98] transition cursor-pointer text-center"
-                  style={{ background: "var(--gradient-primary)" }}
+                  onClick={() => setShowSettings(false)}
+                  className="rounded-lg border border-border px-4 py-2 text-xs font-semibold text-foreground hover:bg-muted active:scale-[0.98] transition cursor-pointer"
                 >
-                  Save Keys
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const savedLovableKey = localStorage.getItem("lovable_api_key") || "";
-                    const savedOpenaiKey = localStorage.getItem("openai_api_key") || "";
-                    setLovableKey(savedLovableKey);
-                    setOpenaiKey(savedOpenaiKey);
-                    setShowSettings(false);
-                  }}
-                  className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted active:scale-[0.98] transition cursor-pointer"
-                >
-                  Cancel
+                  Back to Chat
                 </button>
               </div>
             </div>

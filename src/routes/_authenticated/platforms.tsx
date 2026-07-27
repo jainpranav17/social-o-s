@@ -101,6 +101,34 @@ const PLATFORMS: PlatformInfo[] = [
 function PlatformsPage() {
   const qc = useQueryClient();
   const [disabledRealPlatforms, setDisabledRealPlatforms] = useState<string[]>([]);
+  const [connectionMode, setConnectionMode] = useState<"real" | "sandbox">(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem("connection_mode") as any) || "real";
+    }
+    return "real";
+  });
+  const [sandboxPlatforms, setSandboxPlatforms] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        return JSON.parse(localStorage.getItem("sandbox_platforms") || "[]");
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
+
+  const saveConnectionMode = (mode: "real" | "sandbox") => {
+    setConnectionMode(mode);
+    localStorage.setItem("connection_mode", mode);
+    qc.invalidateQueries({ queryKey: ["connected-platforms-count"] });
+  };
+
+  const saveSandboxPlatforms = (updated: string[]) => {
+    setSandboxPlatforms(updated);
+    localStorage.setItem("sandbox_platforms", JSON.stringify(updated));
+    qc.invalidateQueries({ queryKey: ["connected-platforms-count"] });
+  };
 
   // Fetch current user auth session details (including identities)
   const { data: user, isLoading: loadingUser } = useQuery({
@@ -149,6 +177,11 @@ function PlatformsPage() {
   };
 
   const handleOpenConnect = (platform: PlatformInfo) => {
+    if (connectionMode === "sandbox") {
+      saveSandboxPlatforms([...sandboxPlatforms, platform.id]);
+      toast.success(`Successfully connected ${platform.name} in Sandbox Mode!`);
+      return;
+    }
     // If it was locally disabled, re-enable it
     if (disabledRealPlatforms.includes(platform.id)) {
       saveDisabledRealPlatforms(disabledRealPlatforms.filter((p) => p !== platform.id));
@@ -194,6 +227,11 @@ function PlatformsPage() {
   };
 
   const handleDisconnect = async (platformId: PlatformId) => {
+    if (connectionMode === "sandbox") {
+      saveSandboxPlatforms(sandboxPlatforms.filter((p) => p !== platformId));
+      toast.success(`Disconnected ${platformId.toUpperCase()} from workspace.`);
+      return;
+    }
     const realConn = getRealConnection(platformId);
     if (realConn) {
       try {
@@ -243,16 +281,43 @@ function PlatformsPage() {
             Manage your social media channels. Connected platforms enable scheduling and analytics.
           </p>
         </div>
+        <div className="flex items-center gap-2 rounded-xl bg-card border border-border p-1 self-start sm:self-center">
+          <button
+            onClick={() => saveConnectionMode("real")}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition active:scale-95 cursor-pointer ${
+              connectionMode === "real"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            Real OAuth
+          </button>
+          <button
+            onClick={() => saveConnectionMode("sandbox")}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition active:scale-95 cursor-pointer flex items-center gap-1 ${
+              connectionMode === "sandbox"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            <Sparkles className="h-3 w-3" /> Sandbox Mode
+          </button>
+        </div>
       </div>
 
       {/* Helper Banner */}
       <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5 flex gap-3 text-sm leading-relaxed">
         <Shield className="h-5 w-5 text-primary shrink-0 mt-0.5" />
         <div>
-          <span className="font-bold">Account Linking Active.</span> Connect platforms by
-          redirecting to their official sign-in screen via Supabase. YouTube works
-          immediately. For Instagram, Facebook, Twitter, and LinkedIn, make sure you have enabled
-          their providers in your **Supabase Dashboard &gt; Authentication &gt; Providers**!
+          {connectionMode === "sandbox" ? (
+            <>
+              <span className="font-bold">Sandbox Mode Active.</span> Click **Connect Account** on any platform to instantly link a simulated profile for offline testing and demo purposes.
+            </>
+          ) : (
+            <>
+              <span className="font-bold">Account Linking Active.</span> Connect platforms by redirecting to their official sign-in screen via Supabase. YouTube works immediately. For Instagram, Facebook, Twitter, and LinkedIn, make sure you have enabled their providers in your **Supabase Dashboard &gt; Authentication &gt; Providers**!
+            </>
+          )}
         </div>
       </div>
 
@@ -260,15 +325,23 @@ function PlatformsPage() {
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {PLATFORMS.map((platform) => {
           const realConn = getRealConnection(platform.id);
-          const isConnected = !!realConn;
+          const isConnected =
+            connectionMode === "sandbox"
+              ? sandboxPlatforms.includes(platform.id)
+              : !!realConn;
           const username =
-            realConn?.identity_data?.name ||
-            realConn?.identity_data?.full_name ||
-            realConn?.identity_data?.email ||
-            "Authorized Account";
-          const linkedAt = realConn?.created_at
-            ? new Date(realConn.created_at).toLocaleDateString()
-            : new Date().toLocaleDateString();
+            connectionMode === "sandbox"
+              ? `${platform.name} Sandbox`
+              : realConn?.identity_data?.name ||
+                realConn?.identity_data?.full_name ||
+                realConn?.identity_data?.email ||
+                "Authorized Account";
+          const linkedAt =
+            connectionMode === "sandbox"
+              ? new Date().toLocaleDateString()
+              : realConn?.created_at
+              ? new Date(realConn.created_at).toLocaleDateString()
+              : new Date().toLocaleDateString();
 
           return (
             <div
@@ -286,7 +359,7 @@ function PlatformsPage() {
                 </div>
                 {isConnected ? (
                   <span className="flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold backdrop-blur-sm">
-                    <Check className="h-3 w-3" /> Connected
+                    <Check className="h-3 w-3" /> {connectionMode === "sandbox" ? "Sandbox" : "Connected"}
                   </span>
                 ) : (
                   <span className="rounded-full bg-black/20 px-3 py-1 text-xs font-semibold backdrop-blur-sm">

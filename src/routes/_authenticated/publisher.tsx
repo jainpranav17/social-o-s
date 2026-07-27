@@ -153,6 +153,12 @@ function PublisherStudio() {
 
   const identities = user?.identities || [];
   const isPlatformConnected = (platformId: PlatformId) => {
+    const connectionMode = localStorage.getItem("connection_mode") || "real";
+    if (connectionMode === "sandbox") {
+      const sandboxPlats = JSON.parse(localStorage.getItem("sandbox_platforms") || "[]");
+      return sandboxPlats.includes(platformId);
+    }
+
     const disabled = JSON.parse(localStorage.getItem("disabled_real_platforms") || "[]");
     if (disabled.includes(platformId)) return false;
 

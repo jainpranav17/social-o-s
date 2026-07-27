@@ -52,6 +52,7 @@ function Dashboard() {
     queryKey: ["user-profile", user?.id],
     enabled: !!user?.id,
     queryFn: async () => {
+      if (!user?.id) return null;
       const { data, error } = await supabase
         .from("profiles")
         .select("display_name")
@@ -124,10 +125,16 @@ function Dashboard() {
     },
   });
 
-  // 4. Fetch connected platforms count dynamically based on the connection mode (always real OAuth now)
+  // 4. Fetch connected platforms count dynamically based on the connection mode
   const { data: connectedCount = 0 } = useQuery({
     queryKey: ["connected-platforms-count"],
     queryFn: async () => {
+      const connectionMode = localStorage.getItem("connection_mode") || "real";
+      if (connectionMode === "sandbox") {
+        const sandboxPlats = JSON.parse(localStorage.getItem("sandbox_platforms") || "[]");
+        return sandboxPlats.length;
+      }
+
       const {
         data: { user: currentUser },
         error,
