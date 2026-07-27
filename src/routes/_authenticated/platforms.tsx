@@ -152,7 +152,7 @@ function PlatformsPage() {
       facebook: "facebook",
       youtube: "google",
       linkedin: "linkedin_oidc",
-      twitter: "twitter",
+      twitter: "x",
     };
     const targetProvider = providerMap[platformId];
     return identities.find((id) => id.provider === targetProvider);
@@ -198,7 +198,7 @@ function PlatformsPage() {
       facebook: "facebook",
       youtube: "google",
       linkedin: "linkedin_oidc",
-      twitter: "twitter",
+      twitter: "x",
     };
 
     const provider = providerMap[platform.id];

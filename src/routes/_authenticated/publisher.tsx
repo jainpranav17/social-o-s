@@ -10,7 +10,7 @@ export async function authorizeTwitterPermissions() {
   localStorage.setItem("disabled_real_platforms", JSON.stringify(disabled.filter((p: string) => p !== "twitter")));
 
   await supabase.auth.linkIdentity({
-    provider: "twitter",
+    provider: "x",
     options: {
       redirectTo: window.location.origin + "/publisher",
     },
@@ -167,7 +167,7 @@ function PublisherStudio() {
       facebook: "facebook",
       youtube: "google",
       linkedin: "linkedin_oidc",
-      twitter: "twitter",
+      twitter: "x",
     };
     const targetProvider = providerMap[platformId];
     return identities.some((id) => id.provider === targetProvider);

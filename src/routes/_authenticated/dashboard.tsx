@@ -147,7 +147,7 @@ function Dashboard() {
         facebook: "facebook",
         youtube: "google",
         linkedin: "linkedin_oidc",
-        twitter: "twitter",
+        twitter: "x",
       };
       const activeProviders = Object.entries(platformToProviderMap)
         .filter(([platformId]) => !disabled.includes(platformId))
