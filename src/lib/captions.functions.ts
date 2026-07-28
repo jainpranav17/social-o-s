@@ -25,11 +25,11 @@ export const generateCaption = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((raw: unknown) => GenerateInput.parse(raw))
   .handler(async ({ data, context }) => {
-    const geminiKey = data.apiKey || process.env.GEMINI_API_KEY;
-    const lovableKey = process.env.LOVABLE_API_KEY;
+    const geminiKey = data.apiKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+    const lovableKey = process.env.LOVABLE_API_KEY || process.env.VITE_LOVABLE_API_KEY;
 
     if (!geminiKey && !lovableKey) {
-      throw new Error("AI is not configured. Please configure GEMINI_API_KEY or LOVABLE_API_KEY in your environment.");
+      throw new Error("AI is not configured. Please configure GEMINI_API_KEY in your environment or Vercel project settings.");
     }
 
     const systemPrompt = `You are an elite social media copywriter for ${data.platform}. Return ONLY valid JSON matching: {"caption": string, "hashtags": string[6-10], "cta": string, "score": integer 0-100 virality estimate}. Use tone: ${data.tone}. Include tasteful emojis where appropriate. Optimize length for ${data.platform}.`;

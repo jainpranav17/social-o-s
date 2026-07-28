@@ -38,7 +38,7 @@ function CaptionStudio() {
 
   const mutation = useMutation({
     mutationFn: () => {
-      const apiKey = localStorage.getItem("lovable_api_key") || undefined;
+      const apiKey = localStorage.getItem("gemini_api_key") || localStorage.getItem("lovable_api_key") || undefined;
       return generate({ data: { topic, audience, tone, platform, apiKey } });
     },
     onSuccess: () => {
