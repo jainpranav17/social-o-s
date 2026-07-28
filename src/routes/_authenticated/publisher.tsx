@@ -3,7 +3,9 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
 import { uploadVideoToYouTube, authorizeYouTubePermissions } from "@/lib/youtube";
+import { generateCaption } from "@/lib/captions.functions";
 
 export async function authorizeTwitterPermissions() {
   const disabled = JSON.parse(localStorage.getItem("disabled_real_platforms") || "[]");
@@ -142,7 +144,16 @@ const PLATFORMS: PlatformOption[] = [
 
 function PublisherStudio() {
   const qc = useQueryClient();
+  const generateFn = useServerFn(generateCaption);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // AI Modal States
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [aiTopic, setAiTopic] = useState("");
+  const [aiAudience, setAiAudience] = useState("");
+  const [aiTone, setAiTone] = useState<"friendly" | "professional" | "marketing" | "funny" | "formal" | "playful">("friendly");
+  const [aiPlatform, setAiPlatform] = useState<PlatformId>("instagram");
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
 
   // Form states
   const [selectedPlatforms, setSelectedPlatforms] = useState<PlatformId[]>([
@@ -264,15 +275,34 @@ function PublisherStudio() {
     }
   };
 
-  const handleImportCaption = () => {
-    const sampleCaptions = [
-      "🚀 Next-level content creation made effortless with AI! Check out our latest workflow breakdown below 👇 #SocialOS #AICreator #Growth",
-      "✨ Building modern web apps with speed & precision. What features are you shipping this week? Let us know in the comments! 🔥 #BuildInPublic",
-      "🎬 Behind the scenes of our latest video release. Don't forget to like, save, and subscribe for more weekly tips! 💡 #Reels #YouTubeShorts",
-    ];
-    const picked = sampleCaptions[Math.floor(Math.random() * sampleCaptions.length)];
-    setCaption(picked);
-    toast.success("AI Caption inserted!");
+  const handleGenerateAiCaption = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!aiTopic.trim()) {
+      toast.error("Please enter a topic to generate AI caption.");
+      return;
+    }
+    setIsGeneratingAi(true);
+    try {
+      const apiKey = localStorage.getItem("gemini_api_key") || localStorage.getItem("lovable_api_key") || undefined;
+      const res = await generateFn({
+        data: {
+          topic: aiTopic,
+          audience: aiAudience,
+          tone: aiTone,
+          platform: aiPlatform,
+          apiKey,
+        },
+      });
+
+      const fullText = `${res.caption}\n\n${res.cta}\n\n${res.hashtags.join(" ")}`;
+      setCaption(fullText);
+      setShowAiModal(false);
+      toast.success("Platform-perfect AI caption inserted!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to generate AI caption.");
+    } finally {
+      setIsGeneratingAi(false);
+    }
   };
 
   const handlePublishSubmit = async (e: React.FormEvent) => {
@@ -616,12 +646,112 @@ function PublisherStudio() {
               </h3>
               <button
                 type="button"
-                onClick={handleImportCaption}
-                className="flex items-center gap-1.5 rounded-lg border border-border bg-surface-elevated px-3 py-1.5 text-xs font-semibold text-foreground transition hover:bg-secondary"
+                onClick={() => setShowAiModal(true)}
+                className="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/20 cursor-pointer shadow-sm"
               >
-                <Sparkles className="h-3.5 w-3.5 text-accent" /> Auto AI Insert
+                <Sparkles className="h-3.5 w-3.5" /> Auto AI Insert
               </button>
             </div>
+
+            {/* AI Generator Modal Overlay */}
+            {showAiModal && (
+              <div className="rounded-xl border border-primary/30 bg-primary/5 p-5 space-y-4 shadow-sm animate-fade-in">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-display text-sm font-semibold flex items-center gap-2 text-foreground">
+                    <Sparkles className="h-4 w-4 text-primary" /> AI Copy Generator Studio
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setShowAiModal(false)}
+                    className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Topic / Content Idea
+                    </label>
+                    <input
+                      type="text"
+                      value={aiTopic}
+                      onChange={(e) => setAiTopic(e.target.value)}
+                      placeholder="e.g. Announcing our new product feature launch this Friday"
+                      className="mt-1 w-full rounded-lg border border-border bg-background p-2.5 text-xs outline-none focus:border-primary text-foreground"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Audience (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={aiAudience}
+                      onChange={(e) => setAiAudience(e.target.value)}
+                      placeholder="e.g. Tech founders, creators, agency leads"
+                      className="mt-1 w-full rounded-lg border border-border bg-background p-2.5 text-xs outline-none focus:border-primary text-foreground"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Target Platform
+                      </label>
+                      <select
+                        value={aiPlatform}
+                        onChange={(e) => setAiPlatform(e.target.value as PlatformId)}
+                        className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-xs capitalize outline-none focus:border-primary text-foreground"
+                      >
+                        <option value="instagram">Instagram</option>
+                        <option value="youtube">YouTube</option>
+                        <option value="linkedin">LinkedIn</option>
+                        <option value="twitter">Twitter / X</option>
+                        <option value="facebook">Facebook</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Tone of Voice
+                      </label>
+                      <select
+                        value={aiTone}
+                        onChange={(e) => setAiTone(e.target.value as any)}
+                        className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-xs capitalize outline-none focus:border-primary text-foreground"
+                      >
+                        <option value="friendly">Friendly</option>
+                        <option value="professional">Professional</option>
+                        <option value="marketing">Marketing</option>
+                        <option value="funny">Funny</option>
+                        <option value="formal">Formal</option>
+                        <option value="playful">Playful</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleGenerateAiCaption}
+                    disabled={isGeneratingAi}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-xs font-semibold text-primary-foreground shadow-glow transition hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                  >
+                    {isGeneratingAi ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating AI Copy...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-3.5 w-3.5" /> Generate & Insert Copy
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
 
             <textarea
               rows={4}
