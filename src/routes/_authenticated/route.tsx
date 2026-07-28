@@ -48,8 +48,15 @@ function AuthedLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col border-r border-border bg-surface p-4 lg:flex">
+    <div className="min-h-screen bg-background cosmic-bg relative overflow-hidden">
+      {/* Background Orbital Graphic */}
+      <div className="cosmic-orbit-container">
+        <div className="cosmic-orbit-ring-1" />
+        <div className="cosmic-orbit-ring-2" />
+        <div className="cosmic-orbit-core" />
+      </div>
+
+      <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col border-r border-border bg-card/60 backdrop-blur-xl p-4 lg:flex z-20">
         <Link to="/dashboard" className="mb-8 flex items-center gap-2 px-2">
           <div
             className="grid h-8 w-8 place-items-center rounded-lg text-primary-foreground shadow-glow"
@@ -129,7 +136,7 @@ function AuthedLayout() {
         </div>
       </header>
 
-      <main className="lg:pl-60">
+      <main className="lg:pl-60 relative z-10">
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-10">
           <Outlet />
         </div>
