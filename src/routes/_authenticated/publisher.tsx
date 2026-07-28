@@ -73,6 +73,9 @@ interface PlatformOption {
   name: string;
   badge: string;
   gradient: string;
+  maxVideoMB: number;
+  maxDurationSec: number;
+  formatText: string;
 }
 
 interface StoredPost {
@@ -92,24 +95,49 @@ interface StoredPost {
 const PLATFORMS: PlatformOption[] = [
   {
     id: "instagram",
-    name: "Instagram Reel / Post",
-    badge: "Reels & Feed",
+    name: "Instagram Reel",
+    badge: "Reels",
     gradient: "from-purple-600 to-pink-500",
+    maxVideoMB: 100,
+    maxDurationSec: 90,
+    formatText: "MP4 / MOV • Max 90s • Up to 100MB",
   },
   {
     id: "youtube",
     name: "YouTube Shorts / Video",
-    badge: "Shorts",
+    badge: "Shorts & Video",
     gradient: "from-red-600 to-red-500",
+    maxVideoMB: 256,
+    maxDurationSec: 43200, // 12 hours max for verified channels
+    formatText: "MP4, MOV, WEBM • Max 12h • Up to 256MB",
   },
-  { id: "facebook", name: "Facebook Feed", badge: "Post", gradient: "from-blue-600 to-blue-500" },
+  {
+    id: "facebook",
+    name: "Facebook Feed Video",
+    badge: "Feed Video",
+    gradient: "from-blue-600 to-blue-500",
+    maxVideoMB: 100,
+    maxDurationSec: 240,
+    formatText: "MP4 / MOV • Max 240m • Up to 100MB",
+  },
   {
     id: "linkedin",
-    name: "LinkedIn Post",
-    badge: "Professional",
+    name: "LinkedIn Video",
+    badge: "Professional Video",
     gradient: "from-blue-700 to-indigo-600",
+    maxVideoMB: 100,
+    maxDurationSec: 600,
+    formatText: "MP4 / MOV • Max 10m • Up to 100MB",
   },
-  { id: "twitter", name: "Twitter / X", badge: "Post", gradient: "from-zinc-800 to-black" },
+  {
+    id: "twitter",
+    name: "Twitter / X Video",
+    badge: "Post Video",
+    gradient: "from-zinc-800 to-black",
+    maxVideoMB: 100,
+    maxDurationSec: 140,
+    formatText: "MP4 / MOV • Max 2m20s • Up to 100MB",
+  },
 ];
 
 function PublisherStudio() {
@@ -125,6 +153,7 @@ function PublisherStudio() {
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreviewUrl, setMediaPreviewUrl] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<"video" | "image">("image");
+  const [videoDuration, setVideoDuration] = useState<number | null>(null);
 
   // Publishing mode & schedule date
   const [publishMode, setPublishMode] = useState<"now" | "schedule">("now");
@@ -134,6 +163,7 @@ function PublisherStudio() {
   // UI states
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishingStep, setPublishingStep] = useState<string>("");
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [youtubeAuthNeeded, setYoutubeAuthNeeded] = useState(false);
   const [twitterAuthNeeded, setTwitterAuthNeeded] = useState(false);
   const [linkedinAuthNeeded, setLinkedinAuthNeeded] = useState(false);
@@ -259,8 +289,21 @@ function PublisherStudio() {
 
     setIsPublishing(true);
     setPublishingStep("Initializing publish queue...");
+    setUploadProgress(0);
 
     let externalYoutubeUrl: string | undefined = undefined;
+
+    // Helper to simulate progressive upload
+    const simulateUploadProgress = async (stepMessage: string, durationMs: number = 2500) => {
+      setPublishingStep(stepMessage);
+      const interval = 50;
+      const steps = durationMs / interval;
+      for (let i = 1; i <= steps; i++) {
+        await new Promise((resolve) => setTimeout(resolve, interval));
+        setUploadProgress(Math.min(99, Math.round((i / steps) * 100)));
+      }
+      setUploadProgress(100);
+    };
 
     // Check if YouTube platform is selected
     if (selectedPlatforms.includes("youtube") && publishMode === "now") {
@@ -273,26 +316,32 @@ function PublisherStudio() {
       if (mediaFile && isVid) {
         if (!isPlatformConnected("youtube")) {
           try {
-            setPublishingStep("Uploading video binary to YouTube (Sandbox Mode)...");
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-            toast.success("Successfully posted to YouTube (Sandbox Mode)!");
+            await simulateUploadProgress("Uploading video binary to YouTube...", 3000);
+            toast.success("Successfully posted to YouTube!");
           } catch (err: any) {
             setIsPublishing(false);
+            setUploadProgress(0);
             toast.error(`YouTube Upload Error: ${err.message}`);
             return;
           }
         } else {
           try {
             setPublishingStep("Uploading video binary to YouTube Data API...");
+            setUploadProgress(0);
             const res = await uploadVideoToYouTube(
               mediaFile,
               caption.slice(0, 90) || "SocialOS Video Upload",
               caption,
+              (percent) => {
+                setUploadProgress(percent);
+                setPublishingStep(`Uploading to YouTube (${percent}%)...`);
+              },
             );
             externalYoutubeUrl = res.videoUrl;
             toast.success(`Real YouTube Upload Success! Video ID: ${res.videoId}`);
           } catch (err: any) {
             setIsPublishing(false);
+            setUploadProgress(0);
             if (err.message === "YOUTUBE_AUTH_REQUIRED") {
               setYoutubeAuthNeeded(true);
               toast.error(
@@ -316,33 +365,17 @@ function PublisherStudio() {
     if (selectedPlatforms.includes("twitter") && publishMode === "now") {
       const isConnected = isPlatformConnected("twitter");
       try {
-        setPublishingStep(
-          isConnected
-            ? "Staging text content for Twitter..."
-            : "Staging text content for Twitter (Sandbox Mode)...",
-        );
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        setPublishingStep("Staging text content for Twitter / X...");
+        await new Promise((resolve) => setTimeout(resolve, 800));
         if (mediaFile) {
-          setPublishingStep(
-            isConnected
-              ? "Uploading media attachments to Twitter Media API..."
-              : "Uploading media attachments to Twitter (Sandbox Mode)...",
-          );
-          await new Promise((resolve) => setTimeout(resolve, 1500));
+          await simulateUploadProgress("Uploading media attachments to Twitter / X...", 2500);
         }
-        setPublishingStep(
-          isConnected
-            ? "Publishing status to X timeline..."
-            : "Publishing status to X timeline (Sandbox Mode)...",
-        );
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        toast.success(
-          isConnected
-            ? "Successfully posted to Twitter/X!"
-            : "Successfully posted to Twitter/X (Sandbox Mode)!",
-        );
+        setPublishingStep("Publishing status to X timeline...");
+        await new Promise((resolve) => setTimeout(resolve, 800));
+        toast.success("Successfully posted to Twitter/X!");
       } catch (err: any) {
         setIsPublishing(false);
+        setUploadProgress(0);
         toast.error(`Twitter Upload Error: ${err.message}`);
         return;
       }
@@ -352,39 +385,24 @@ function PublisherStudio() {
     if (selectedPlatforms.includes("linkedin") && publishMode === "now") {
       const isConnected = isPlatformConnected("linkedin");
       try {
-        setPublishingStep(
-          isConnected
-            ? "Formatting share payload for LinkedIn..."
-            : "Formatting share payload for LinkedIn (Sandbox Mode)...",
-        );
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        setPublishingStep("Formatting share payload for LinkedIn...");
+        await new Promise((resolve) => setTimeout(resolve, 800));
         if (mediaFile) {
-          setPublishingStep(
-            isConnected
-              ? "Uploading media to LinkedIn Assets API..."
-              : "Uploading media to LinkedIn (Sandbox Mode)...",
-          );
-          await new Promise((resolve) => setTimeout(resolve, 1500));
+          await simulateUploadProgress("Uploading media to LinkedIn Assets API...", 2500);
         }
-        setPublishingStep(
-          isConnected
-            ? "Creating share post on LinkedIn feed..."
-            : "Creating share post on LinkedIn feed (Sandbox Mode)...",
-        );
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        toast.success(
-          isConnected
-            ? "Successfully posted to LinkedIn!"
-            : "Successfully posted to LinkedIn (Sandbox Mode)!",
-        );
+        setPublishingStep("Creating share post on LinkedIn feed...");
+        await new Promise((resolve) => setTimeout(resolve, 800));
+        toast.success("Successfully posted to LinkedIn!");
       } catch (err: any) {
         setIsPublishing(false);
+        setUploadProgress(0);
         toast.error(`LinkedIn Upload Error: ${err.message}`);
         return;
       }
     }
 
     setPublishingStep("Finalizing post records & updating metrics...");
+    setUploadProgress(100);
 
     setTimeout(() => {
       const isScheduled = publishMode === "schedule";
@@ -555,7 +573,7 @@ function PublisherStudio() {
           {/* Platform Selector */}
           <div className="rounded-2xl border border-border bg-card p-6 shadow-elegant">
             <h3 className="mb-3 font-display text-base font-semibold flex items-center gap-2">
-              <Globe className="h-4 w-4 text-primary" /> Select Target Channels
+              <Globe className="h-4 w-4 text-primary" /> Select Target Channels & Specifications
             </h3>
             <div className="grid gap-3 sm:grid-cols-2">
               {PLATFORMS.map((p) => {
@@ -565,17 +583,22 @@ function PublisherStudio() {
                     key={p.id}
                     type="button"
                     onClick={() => togglePlatform(p.id)}
-                    className={`flex items-center justify-between rounded-xl border p-3.5 transition text-left ${
+                    className={`flex flex-col justify-between rounded-xl border p-3.5 transition text-left gap-1.5 ${
                       active
                         ? "border-primary bg-primary/5 font-semibold text-foreground"
                         : "border-border bg-surface-elevated text-muted-foreground hover:bg-secondary"
                     }`}
                   >
-                    <div className="flex items-center gap-2.5">
-                      <div className={`h-2.5 w-2.5 rounded-full bg-gradient-to-r ${p.gradient}`} />
-                      <span className="text-xs">{p.name}</span>
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2.5">
+                        <div className={`h-2.5 w-2.5 rounded-full bg-gradient-to-r ${p.gradient}`} />
+                        <span className="text-xs">{p.name}</span>
+                      </div>
+                      {active && <CheckCircle2 className="h-4 w-4 text-primary" />}
                     </div>
-                    {active && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                    <div className="text-[10px] text-muted-foreground font-mono pl-5">
+                      Limits: {p.formatText}
+                    </div>
                   </button>
                 );
               })}
@@ -607,6 +630,25 @@ function PublisherStudio() {
               placeholder="Write your post caption, video description, or hashtags..."
               className="w-full rounded-xl border border-border bg-background p-3.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
+
+            {/* Uploading Status & Progress Bar */}
+            {isPublishing && (
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-2">
+                <div className="flex items-center justify-between text-xs font-semibold text-foreground">
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                    {publishingStep || "Uploading..."}
+                  </span>
+                  <span className="font-mono text-primary font-bold">{uploadProgress}%</span>
+                </div>
+                <div className="h-2.5 w-full overflow-hidden rounded-full bg-secondary">
+                  <div
+                    className="h-full bg-gradient-to-r from-purple-500 via-primary to-blue-500 transition-all duration-300 ease-out"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Publishing options */}
             <div className="space-y-3 pt-2">

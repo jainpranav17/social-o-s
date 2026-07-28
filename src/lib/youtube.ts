@@ -32,6 +32,7 @@ export async function uploadVideoToYouTube(
   file: File,
   title: string,
   description: string,
+  onProgress?: (percent: number) => void,
 ): Promise<YouTubeUploadResult> {
   const {
     data: { session },
@@ -65,32 +66,54 @@ export async function uploadVideoToYouTube(
     },
   });
 
-  // 2. Stream binary file directly from browser to Google's CORS-enabled upload URL
-  const response = await fetch(uploadUrl, {
-    method: "PUT",
-    headers: {
-      "Content-Type": file.type || "video/mp4",
-    },
-    body: file,
-  });
+  // 2. Stream binary file directly from browser to Google's CORS-enabled upload URL using XHR for progress tracking
+  return new Promise<YouTubeUploadResult>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", uploadUrl, true);
+    xhr.setRequestHeader("Content-Type", file.type || "video/mp4");
 
-  if (!response.ok) {
-    const errorJson = await response.json().catch(() => ({}));
-    const msg =
-      errorJson?.error?.message || `YouTube direct upload failed (HTTP ${response.status})`;
-    if (response.status === 401 || response.status === 403) {
-      localStorage.removeItem("youtube_provider_token");
-      throw new Error("YOUTUBE_AUTH_REQUIRED");
+    if (xhr.upload && onProgress) {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          onProgress(percent);
+        }
+      };
     }
-    throw new Error(msg);
-  }
 
-  const json = await response.json();
-  const videoId = json.id;
-  return {
-    videoId,
-    videoUrl: `https://www.youtube.com/watch?v=${videoId}`,
-  };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const json = JSON.parse(xhr.responseText);
+          const videoId = json.id;
+          resolve({
+            videoId,
+            videoUrl: `https://www.youtube.com/watch?v=${videoId}`,
+          });
+        } catch (e: any) {
+          reject(new Error("Failed to parse YouTube response"));
+        }
+      } else {
+        if (xhr.status === 401 || xhr.status === 403) {
+          localStorage.removeItem("youtube_provider_token");
+          reject(new Error("YOUTUBE_AUTH_REQUIRED"));
+          return;
+        }
+        let msg = `YouTube direct upload failed (HTTP ${xhr.status})`;
+        try {
+          const errJson = JSON.parse(xhr.responseText);
+          if (errJson?.error?.message) msg = errJson.error.message;
+        } catch (_) {}
+        reject(new Error(msg));
+      }
+    };
+
+    xhr.onerror = () => {
+      reject(new Error("Network error during YouTube video upload."));
+    };
+
+    xhr.send(file);
+  });
 }
 
 export async function authorizeYouTubePermissions() {
