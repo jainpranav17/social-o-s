@@ -57,38 +57,48 @@ export const generateCaption = createServerFn({ method: "POST" })
     let resultData: z.infer<typeof CaptionResult>;
 
     if (geminiKey) {
-      res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  { text: systemPrompt + "\n\n" + userPrompt }
-                ]
-              }
-            ],
-            generationConfig: {
-              responseMimeType: "application/json",
+      const modelsToTry = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.0-flash-lite"];
+      let lastError = "";
+
+      for (const modelName of modelsToTry) {
+        try {
+          res = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [
+                  {
+                    parts: [
+                      { text: systemPrompt + "\n\n" + userPrompt }
+                    ]
+                  }
+                ],
+                generationConfig: {
+                  responseMimeType: "application/json",
+                }
+              }),
             }
-          }),
+          );
+
+          if (res.ok) {
+            const json = await res.json();
+            const raw = json?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+            const parsed = CaptionResult.safeParse(JSON.parse(raw));
+            if (parsed.success) {
+              return parsed.data;
+            }
+          } else {
+            const errText = await res.text().catch(() => "");
+            lastError = `Gemini API Error (${res.status}): ${errText || "Request failed"}`;
+          }
+        } catch (e: any) {
+          lastError = e.message;
         }
-      );
-
-      if (!res.ok) {
-        const errText = await res.text().catch(() => "");
-        throw new Error(`Gemini API Error (${res.status}): ${errText || "Request failed"}`);
       }
 
-      const json = await res.json();
-      const raw = json?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
-      const parsed = CaptionResult.safeParse(JSON.parse(raw));
-      if (!parsed.success) {
-        throw new Error("Failed to parse caption JSON from Gemini response.");
-      }
-      resultData = parsed.data;
+      throw new Error(lastError || "Failed to generate caption with Gemini API.");
     } else {
       res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
