@@ -25,55 +25,103 @@ export const generateCaption = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((raw: unknown) => GenerateInput.parse(raw))
   .handler(async ({ data, context }) => {
-    const key = data.apiKey || process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("AI is not configured. Please configure your LOVABLE_API_KEY in your .env file or enter a valid Lovable API Key in the Chatbot settings.");
+    const geminiKey = data.apiKey || process.env.GEMINI_API_KEY;
+    const lovableKey = process.env.LOVABLE_API_KEY;
+
+    if (!geminiKey && !lovableKey) {
+      throw new Error("AI is not configured. Please configure GEMINI_API_KEY or LOVABLE_API_KEY in your environment.");
+    }
 
     const systemPrompt = `You are an elite social media copywriter for ${data.platform}. Return ONLY valid JSON matching: {"caption": string, "hashtags": string[6-10], "cta": string, "score": integer 0-100 virality estimate}. Use tone: ${data.tone}. Include tasteful emojis where appropriate. Optimize length for ${data.platform}.`;
 
     const userPrompt = `Topic: ${data.topic}\nAudience: ${data.audience || "general"}\nGenerate the caption now.`;
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        response_format: { type: "json_object" },
-      }),
-    });
+    let res: Response;
+    let resultData: z.infer<typeof CaptionResult>;
 
-    if (!res.ok) {
-      if (res.status === 429) throw new Error("Rate limited. Please try again in a moment.");
-      if (res.status === 402)
-        throw new Error("AI credits exhausted. Please add credits in your workspace.");
-      throw new Error(`AI request failed (${res.status})`);
+    if (geminiKey) {
+      res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { text: systemPrompt + "\n\n" + userPrompt }
+                ]
+              }
+            ],
+            generationConfig: {
+              responseMimeType: "application/json",
+            }
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        throw new Error(`Gemini API Error (${res.status}): ${errText || "Request failed"}`);
+      }
+
+      const json = await res.json();
+      const raw = json?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+      const parsed = CaptionResult.safeParse(JSON.parse(raw));
+      if (!parsed.success) {
+        throw new Error("Failed to parse caption JSON from Gemini response.");
+      }
+      resultData = parsed.data;
+    } else {
+      res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${lovableKey}`,
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3.5-flash",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          response_format: { type: "json_object" },
+        }),
+      });
+
+      if (!res.ok) {
+        if (res.status === 429) throw new Error("Rate limited. Please try again in a moment.");
+        if (res.status === 402)
+          throw new Error("AI credits exhausted. Please add credits in your workspace.");
+        throw new Error(`AI request failed (${res.status})`);
+      }
+
+      const json = await res.json();
+      const raw = json?.choices?.[0]?.message?.content ?? "{}";
+      const parsed = CaptionResult.safeParse(JSON.parse(raw));
+      if (!parsed.success) {
+        throw new Error("Failed to parse caption JSON from AI response.");
+      }
+      resultData = parsed.data;
     }
 
-    const json = await res.json();
-    const raw = json?.choices?.[0]?.message?.content ?? "{}";
-    const parsed = CaptionResult.safeParse(JSON.parse(raw));
-    if (!parsed.success) throw new Error("AI returned an unexpected response. Try again.");
+    try {
+      await context.supabase.from("captions").insert({
+        user_id: context.userId,
+        topic: data.topic,
+        audience: data.audience || null,
+        tone: data.tone,
+        platform: data.platform,
+        caption: resultData.caption,
+        hashtags: resultData.hashtags,
+        cta: resultData.cta,
+        score: resultData.score,
+      });
+    } catch (err) {
+      console.error("Failed to persist caption:", err);
+    }
 
-    const { error } = await context.supabase.from("captions").insert({
-      user_id: context.userId,
-      topic: data.topic,
-      audience: data.audience || null,
-      tone: data.tone,
-      platform: data.platform,
-      caption: parsed.data.caption,
-      hashtags: parsed.data.hashtags,
-      cta: parsed.data.cta,
-      score: parsed.data.score,
-    });
-    if (error) console.error("Failed to persist caption:", error);
-
-    return parsed.data;
+    return resultData;
   });
 
 export const listCaptions = createServerFn({ method: "GET" })
