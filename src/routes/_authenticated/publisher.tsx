@@ -107,9 +107,9 @@ const PLATFORMS: PlatformOption[] = [
     name: "YouTube Shorts / Video",
     badge: "Shorts & Video",
     gradient: "from-red-600 to-red-500",
-    maxVideoMB: 256,
+    maxVideoMB: 2048,
     maxDurationSec: 43200, // 12 hours max for verified channels
-    formatText: "MP4, MOV, WEBM • Max 12h • Up to 256MB",
+    formatText: "MP4, MOV, WEBM • Max 12h • Up to 2GB",
   },
   {
     id: "facebook",
@@ -231,8 +231,8 @@ function PublisherStudio() {
   };
 
   const handleFileSelect = (file: File) => {
-    if (file.size > 100 * 1024 * 1024) {
-      toast.error("File size exceeds 100MB limit.");
+    if (file.size > 2048 * 1024 * 1024) {
+      toast.error("File size exceeds 2GB limit.");
       return;
     }
     const isVid =
@@ -564,7 +564,7 @@ function PublisherStudio() {
                   Drag & drop video reel or image here
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  Supports MP4, MOV, WEBM, PNG, JPG (Max 100MB)
+                  Supports MP4, MOV, WEBM, PNG, JPG (Max 2GB)
                 </div>
               </div>
             )}
