@@ -48,54 +48,46 @@
 :root {
   --radius: 0.875rem;
 
-  /* Light mode base */
-  --background: oklch(0.99 0.005 260);
-  --foreground: oklch(0.18 0.03 265);
-  --surface: oklch(0.985 0.005 260);
-  --surface-elevated: oklch(1 0 0);
+  /* Premium Light mode base */
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-elevated: #ffffff;
 
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.03 265);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.03 265);
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
 
-  /* Brand: blue */
-  --primary: oklch(0.56 0.22 264);
-  --primary-foreground: oklch(0.99 0.005 260);
-  --primary-glow: oklch(0.7 0.2 285);
+  /* Brand: Vibrant Deep Violet/Indigo */
+  --primary: #6366f1;
+  --primary-foreground: #ffffff;
+  --primary-glow: #818cf8;
 
-  /* Secondary: purple */
-  --secondary: oklch(0.96 0.01 265);
-  --secondary-foreground: oklch(0.28 0.05 265);
+  /* Secondary */
+  --secondary: #f1f5f9;
+  --secondary-foreground: #1e293b;
 
-  /* Accent: emerald */
-  --accent: oklch(0.72 0.17 160);
-  --accent-foreground: oklch(0.15 0.04 160);
+  /* Accent: Emerald */
+  --accent: #10b981;
+  --accent-foreground: #ffffff;
 
-  --muted: oklch(0.965 0.008 260);
-  --muted-foreground: oklch(0.5 0.02 260);
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
 
-  --destructive: oklch(0.62 0.24 27);
-  --destructive-foreground: oklch(0.99 0 0);
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
 
-  --border: oklch(0.92 0.01 260);
-  --input: oklch(0.93 0.01 260);
-  --ring: oklch(0.56 0.22 264);
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #6366f1;
 
-  --gradient-primary: linear-gradient(135deg, oklch(0.56 0.22 264), oklch(0.6 0.24 300));
+  --gradient-primary: linear-gradient(135deg, #6366f1, #a855f7);
   --gradient-hero:
-    radial-gradient(ellipse at top, oklch(0.56 0.22 264 / 0.22), transparent 60%),
-    radial-gradient(ellipse at bottom right, oklch(0.6 0.24 300 / 0.18), transparent 60%);
-  --gradient-mesh: conic-gradient(
-    from 180deg at 50% 50%,
-    oklch(0.56 0.22 264 / 0.15),
-    oklch(0.6 0.24 300 / 0.15),
-    oklch(0.72 0.17 160 / 0.15),
-    oklch(0.56 0.22 264 / 0.15)
-  );
-
-  --shadow-glow: 0 20px 60px -20px oklch(0.56 0.22 264 / 0.35);
-  --shadow-elegant: 0 10px 30px -10px oklch(0.28 0.05 265 / 0.15);
+    radial-gradient(ellipse at top, rgba(99, 102, 241, 0.12), transparent 60%),
+    radial-gradient(ellipse at bottom right, rgba(168, 85, 247, 0.1), transparent 60%);
+  --shadow-glow: 0 12px 40px -10px rgba(99, 102, 241, 0.3);
+  --shadow-elegant: 0 10px 25px -5px rgba(15, 23, 42, 0.06);
 }
 
 .dark {
@@ -165,6 +157,20 @@
 /* Cosmic Dynamic Background System */
 .cosmic-bg {
   position: relative;
+  background-color: #f8fafc;
+  background-image: 
+    radial-gradient(circle at 10% 10%, rgba(99, 102, 241, 0.08), transparent 40%),
+    radial-gradient(circle at 90% 20%, rgba(168, 85, 247, 0.07), transparent 35%),
+    radial-gradient(circle at 50% 90%, rgba(236, 72, 153, 0.05), transparent 45%),
+    radial-gradient(2px 2px at 20px 30px, rgba(99, 102, 241, 0.15), rgba(0,0,0,0)),
+    radial-gradient(2px 2px at 160px 120px, rgba(168, 85, 247, 0.2), rgba(0,0,0,0)),
+    radial-gradient(2px 2px at 310px 250px, rgba(99, 102, 241, 0.18), rgba(0,0,0,0)),
+    radial-gradient(2px 2px at 450px 320px, rgba(168, 85, 247, 0.15), rgba(0,0,0,0));
+  background-repeat: repeat;
+  background-size: cover, cover, cover, 550px 550px, 550px 550px, 550px 550px, 550px 550px;
+}
+
+.dark .cosmic-bg {
   background-color: #030712;
   background-image: 
     radial-gradient(circle at 15% 15%, rgba(124, 58, 237, 0.15), transparent 45%),
@@ -192,6 +198,10 @@
   height: 550px;
   pointer-events: none;
   z-index: 0;
+  opacity: 0.25;
+}
+
+.dark .cosmic-orbit-container {
   opacity: 0.35;
 }
 
@@ -199,7 +209,7 @@
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  border: 1px dashed rgba(124, 58, 237, 0.4);
+  border: 1px dashed rgba(99, 102, 241, 0.3);
   animation: spin-slow 40s linear infinite;
 }
 
@@ -207,7 +217,7 @@
   position: absolute;
   inset: 40px;
   border-radius: 50%;
-  border: 1px solid rgba(59, 130, 246, 0.3);
+  border: 1px solid rgba(168, 85, 247, 0.25);
   animation: spin-reverse 30s linear infinite;
 }
 
@@ -215,7 +225,7 @@
   position: absolute;
   inset: 100px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(147, 51, 234, 0.3) 0%, rgba(59, 130, 246, 0.1) 60%, transparent 80%);
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.18) 0%, rgba(168, 85, 247, 0.08) 60%, transparent 80%);
   filter: blur(20px);
 }
 
